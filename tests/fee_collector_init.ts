@@ -76,36 +76,41 @@ async function main() {
     PriceMath.tickIndexToPrice(upper_tick_index, token_a.decimals, token_b.decimals).toFixed(token_b.decimals)
   );
 
+    // Find a PDA account for the fee collector program
+    const [pdaFeeCollectorProgram, bumpFeeCollector] = await anchor.web3.PublicKey.findProgramAddress([Buffer.from("fee_collector", "utf-8")], program.programId);
+    //let bumpBytes = Buffer.from(new Uint8Array([bumpFeeCollector]));
+    console.log("Fee Collector PDA address:", pdaFeeCollectorProgram.toBase58());
+    console.log("Fee Collector PDA bump:", bumpFeeCollector);
+
     // Find a PDA account for the lockbox program
-    const [pdaLockboxProgram, bumpLockbox] = await anchor.web3.PublicKey.findProgramAddress([Buffer.from("liquidity_lockbox", "utf-8")], program.programId);
-    const bumpBytes = Buffer.from(new Uint8Array([bumpLockbox]));
+    const [pdaLockboxProgram, bumpLockbox] = await anchor.web3.PublicKey.findProgramAddress([Buffer.from("liquidity_lockbox", "utf-8")], program_lockbox.programId);
+    //bumpBytes = Buffer.from(new Uint8Array([bumpLockbox]));
     console.log("Lockbox PDA address:", pdaLockboxProgram.toBase58());
     console.log("Lockbox PDA bump:", bumpLockbox);
 
     // Create new bridged token mint with the pda mint authority
     const bridgedTokenMint = await createMint(provider.connection, userWallet, pdaLockboxProgram, null, 8);
     console.log("Bridged token mint:", bridgedTokenMint.toBase58());
-    return;
 
     let accountInfo = await provider.connection.getAccountInfo(bridgedTokenMint);
     //console.log(accountInfo);
 
-    // Get the tokenA ATA of the program dedicated address for fee collection, and if it does not exist, create it
-    const feeCollectorTokenOwnerAccountA = await getOrCreateAssociatedTokenAccount(
-        provider.connection,
-        userWallet,
-        token_a.mint,
-        userWallet.publicKey
-    );
-    console.log("Fee collector ATA for tokenA:", feeCollectorTokenOwnerAccountA.address.toBase58());
-
-    const feeCollectorTokenOwnerAccountB = await getOrCreateAssociatedTokenAccount(
-        provider.connection,
-        userWallet,
-        token_b.mint,
-        userWallet.publicKey
-    );
-    console.log("Fee collector ATA for tokenB:", feeCollectorTokenOwnerAccountB.address.toBase58());
+//    // Get the tokenA ATA of the program dedicated address for fee collection, and if it does not exist, create it
+//    const feeCollectorTokenOwnerAccountA = await getOrCreateAssociatedTokenAccount(
+//        provider.connection,
+//        userWallet,
+//        token_a.mint,
+//        userWallet.publicKey
+//    );
+//    console.log("Fee collector ATA for tokenA:", feeCollectorTokenOwnerAccountA.address.toBase58());
+//
+//    const feeCollectorTokenOwnerAccountB = await getOrCreateAssociatedTokenAccount(
+//        provider.connection,
+//        userWallet,
+//        token_b.mint,
+//        userWallet.publicKey
+//    );
+//    console.log("Fee collector ATA for tokenB:", feeCollectorTokenOwnerAccountB.address.toBase58());
 
   // Get all teh accounts for the initial zero position
   const positionMintKeypair = anchor.web3.Keypair.generate();
@@ -152,19 +157,40 @@ async function main() {
         }
     }
 
+  // ATA for the Fee Collector PDA to store collected SOL
+  const pdaFeeCollectorSOLAccount = await getAssociatedTokenAddress(
+      token_a.mint,
+      pdaFeeCollectorProgram,
+      true // allowOwnerOffCurve - allow pda accounts to be have associated token account
+  );
+  console.log("Fee Collector PDA SOL ATA:", pdaFeeCollectorSOLAccount.toBase58());
+
+  // ATA for the Fee Collector PDA to store collected SOL
+  const pdaFeeCollectorOLASAccount = await getAssociatedTokenAddress(
+      token_b.mint,
+      pdaFeeCollectorProgram,
+      true // allowOwnerOffCurve - allow pda accounts to be have associated token account
+  );
+  console.log("Fee Collector PDA OLAS ATA:", pdaFeeCollectorOLASAccount.toBase58());
+
     // Initialize the LiquidityLockbox state
     try {
         signature = await program.methods
           .initialize()
           .accounts(
             {
+              collector: pdaFeeCollectorProgram,
+              tokenSolMint: token_a.mint,
+              tokenOlasMint: token_b.mint,
+              tokenSolAccount: pdaFeeCollectorSOLAccount,
+              tokenOlasAccount: pdaFeeCollectorOLASAccount,
+              lockbox: pdaLockboxProgram,
               bridgedTokenMint: bridgedTokenMint,
-              feeCollectorTokenOwnerAccountA: feeCollectorTokenOwnerAccountA.address,
-              feeCollectorTokenOwnerAccountB: feeCollectorTokenOwnerAccountB.address,
               position: position,
               positionMint: positionMint,
               pdaPositionAccount,
-              whirlpool
+              whirlpool,
+              lockboxProgram: lockbox
             }
           )
           .rpc();
