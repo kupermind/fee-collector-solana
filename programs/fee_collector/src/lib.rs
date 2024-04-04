@@ -32,12 +32,12 @@ pub mod fee_collector {
     ctx: Context<InitializeFeeCollector>
   ) -> Result<()> {
     // Check that the first token mint is SOL
-    if ctx.accounts.token_sol_mint.key() != SOL {
+    if ctx.accounts.token_sol_account.mint != SOL {
       return Err(ErrorCode::WrongTokenMint.into());
     }
 
     // Check that the second token mint is OLAS
-    if ctx.accounts.token_olas_mint.key() != OLAS {
+    if ctx.accounts.token_olas_account.mint != OLAS {
       return Err(ErrorCode::WrongTokenMint.into());
     }
 
@@ -54,6 +54,8 @@ pub mod fee_collector {
 
     // Get fee collector signer seeds
     let signer_seeds = &[&ctx.accounts.collector.seeds()[..]];
+
+
 
     // CPI call to increase liquidity
     let cpi_program_lockbox_initialize = ctx.accounts.lockbox_program.to_account_info();
@@ -94,36 +96,28 @@ pub struct InitializeFeeCollector<'info> {
     ],
     bump,
     payer = signer,
-    space = FeeCollector::LEN)]
+    space = FeeCollector::LEN
+  )]
   pub collector: Box<Account<'info, FeeCollector>>,
 
-//   #[account(constraint = bridged_token_mint.mint_authority.unwrap() == lockbox.key())]
-//   pub bridged_token_mint: Box<Account<'info, Mint>>,
 
-  #[account(constraint = token_sol_mint.key() != token_olas_mint.key())]
-  pub token_sol_mint: Box<Account<'info, Mint>>,
-  pub token_olas_mint: Box<Account<'info, Mint>>,
-
-  #[account(init,
-    token::mint = token_sol_mint,
-    token::authority = collector,
-    payer = signer,
-    )]
+  #[account(constraint = collector.key() == token_sol_account.owner,
+    constraint = token_sol_account.mint != token_olas_account.mint
+  )]
   pub token_sol_account: Box<Account<'info, TokenAccount>>,
 
-  #[account(init,
-    token::mint = token_olas_mint,
-    token::authority = collector,
-    payer = signer,
-    )]
+  #[account(constraint = collector.key() == token_olas_account.owner)]
   pub token_olas_account: Box<Account<'info, TokenAccount>>,
 
-  #[account(mut, constraint = lockbox.to_account_info().owner == &lockbox_program.key())]
-  pub lockbox: Box<Account<'info, LiquidityLockbox>>,
+  //#[account(constraint = lockbox.to_account_info().owner == &lockbox_program.key())]
+  /// CHECK: Check later
+  #[account(mut)]
+  pub lockbox: UncheckedAccount<'info>,
   // All of the following account are checked in the Liquidity Lockbox program initialization
   pub bridged_token_mint: Box<Account<'info, Mint>>,
   pub position: Box<Account<'info, Position>>,
   pub position_mint: Box<Account<'info, Mint>>,
+  #[account(mut)]
   pub pda_position_account: Box<Account<'info, TokenAccount>>,
   pub whirlpool: Box<Account<'info, Whirlpool>>,
   pub lockbox_program: Program<'info, liquidity_lockbox::program::LiquidityLockbox>,

@@ -95,22 +95,25 @@ async function main() {
     let accountInfo = await provider.connection.getAccountInfo(bridgedTokenMint);
     //console.log(accountInfo);
 
-//    // Get the tokenA ATA of the program dedicated address for fee collection, and if it does not exist, create it
-//    const feeCollectorTokenOwnerAccountA = await getOrCreateAssociatedTokenAccount(
-//        provider.connection,
-//        userWallet,
-//        token_a.mint,
-//        userWallet.publicKey
-//    );
-//    console.log("Fee collector ATA for tokenA:", feeCollectorTokenOwnerAccountA.address.toBase58());
-//
-//    const feeCollectorTokenOwnerAccountB = await getOrCreateAssociatedTokenAccount(
-//        provider.connection,
-//        userWallet,
-//        token_b.mint,
-//        userWallet.publicKey
-//    );
-//    console.log("Fee collector ATA for tokenB:", feeCollectorTokenOwnerAccountB.address.toBase58());
+    // ATA for the Fee Collector PDA to store collected SOL
+    const pdaFeeCollectorSOLAccount = await getOrCreateAssociatedTokenAccount(
+        provider.connection,
+        userWallet,
+        token_a.mint,
+        pdaFeeCollectorProgram,
+        true
+    );
+    console.log("Fee Collector PDA SOL ATA:", pdaFeeCollectorSOLAccount.address.toBase58());
+
+    // ATA for the Fee Collector PDA to store collected SOL
+    const pdaFeeCollectorOLASAccount = await getOrCreateAssociatedTokenAccount(
+        provider.connection,
+        userWallet,
+        token_b.mint,
+        pdaFeeCollectorProgram,
+        true
+    );
+    console.log("Fee Collector PDA OLAS ATA:", pdaFeeCollectorOLASAccount.address.toBase58());
 
   // Get all teh accounts for the initial zero position
   const positionMintKeypair = anchor.web3.Keypair.generate();
@@ -156,34 +159,26 @@ async function main() {
             console.error("Transaction Error:", error);
         }
     }
+    //console.log("Your transaction signature", signature);
+    // Wait for program creation confirmation
+    await provider.connection.confirmTransaction({
+        signature: signature,
+        ...(await provider.connection.getLatestBlockhash()),
+    });
+    console.log("Position is created");
 
-  // ATA for the Fee Collector PDA to store collected SOL
-  const pdaFeeCollectorSOLAccount = await getAssociatedTokenAddress(
-      token_a.mint,
-      pdaFeeCollectorProgram,
-      true // allowOwnerOffCurve - allow pda accounts to be have associated token account
-  );
-  console.log("Fee Collector PDA SOL ATA:", pdaFeeCollectorSOLAccount.toBase58());
+    await provider.connection.requestAirdrop(pdaFeeCollectorProgram, 100000000000);
+    await provider.connection.requestAirdrop(pdaLockboxProgram, 100000000000);
 
-  // ATA for the Fee Collector PDA to store collected SOL
-  const pdaFeeCollectorOLASAccount = await getAssociatedTokenAddress(
-      token_b.mint,
-      pdaFeeCollectorProgram,
-      true // allowOwnerOffCurve - allow pda accounts to be have associated token account
-  );
-  console.log("Fee Collector PDA OLAS ATA:", pdaFeeCollectorOLASAccount.toBase58());
-
-    // Initialize the LiquidityLockbox state
+    // Initialize the FeeCollector program
     try {
         signature = await program.methods
           .initialize()
           .accounts(
             {
               collector: pdaFeeCollectorProgram,
-              tokenSolMint: token_a.mint,
-              tokenOlasMint: token_b.mint,
-              tokenSolAccount: pdaFeeCollectorSOLAccount,
-              tokenOlasAccount: pdaFeeCollectorOLASAccount,
+              tokenSolAccount: pdaFeeCollectorSOLAccount.address,
+              tokenOlasAccount: pdaFeeCollectorOLASAccount.address,
               lockbox: pdaLockboxProgram,
               bridgedTokenMint: bridgedTokenMint,
               position: position,
