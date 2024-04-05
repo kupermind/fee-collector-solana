@@ -1,15 +1,6 @@
 pub mod state;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Approve, Transfer};
-use liquidity_lockbox::{
-  self,
-  state::{LiquidityLockbox},
-  cpi::accounts::InitializeLiquidityLockbox
-};
-use whirlpool::{
-  self,
-  state::{Whirlpool, Position},
-};
 use solana_program::{
   pubkey::Pubkey,
   program::invoke_signed,
