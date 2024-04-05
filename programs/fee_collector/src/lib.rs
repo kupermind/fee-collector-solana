@@ -187,9 +187,6 @@ pub struct ChangeUpgradeAuthorityFeeCollector<'info> {
   /// CHECK: Check later
   #[account(mut)]
   pub destination: UncheckedAccount<'info>,
-
-  /// CHECK: Check later
-  pub bpf_loader: UncheckedAccount<'info>
 }
 
 

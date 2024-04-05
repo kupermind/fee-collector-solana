@@ -30,7 +30,6 @@ async function main() {
   // Deploy this manually with the solana program deploy...
   const lockbox = new anchor.web3.PublicKey("1okwt4nGbpr82kkr6t1767sAenfeZBxUyzJAAaumZRG");
   const lockboxData = new anchor.web3.PublicKey("Gdt3RDEQmw51NCcUJ13tXR6nj9sgKMaZe1Pic8JSRDfb");
-  const bpfLoader = new anchor.web3.PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
 
   // User wallet is the provider payer
   const userWallet = provider.wallet["payer"];
@@ -87,8 +86,7 @@ async function main() {
               programToUpdateAuthority: lockbox,
               programDataToUpdateAuthority: lockboxData,
               collector: pdaFeeCollectorProgram,
-              destination: userWallet.publicKey,
-              bpfLoader
+              destination: userWallet.publicKey
             }
           )
           .rpc();
