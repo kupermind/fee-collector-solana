@@ -4,8 +4,8 @@ import * as idl_whirlpool from "../artifacts/whirlpool.json";
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import {
-  createMint, mintTo, transfer, getOrCreateAssociatedTokenAccount, syncNative,
-  unpackAccount, TOKEN_PROGRAM_ID, AccountLayout, getAssociatedTokenAddress
+  createMint, mintTo, transfer, getOrCreateAssociatedTokenAccount, syncNative, createAssociatedTokenAccount,
+  unpackAccount, TOKEN_PROGRAM_ID, AccountLayout, getAssociatedTokenAddress, setAuthority, AuthorityType
 } from "@solana/spl-token";
 import {
   WhirlpoolContext, buildWhirlpoolClient, ORCA_WHIRLPOOL_PROGRAM_ID,
@@ -26,7 +26,7 @@ async function main() {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
-  const PROGRAM_ID = new anchor.web3.PublicKey("DWDGo2UkBUFZ3VitBfWRBMvRnHr7E2DSh57NK27xMYaB");
+  const PROGRAM_ID = new anchor.web3.PublicKey("tQTEADxm7KkqPiMJUqEixAxdYNrwmftTvqvyCC69qZz");
   const program = new Program(idl as anchor.Idl, PROGRAM_ID, anchor.getProvider());
 
   const lockbox = new anchor.web3.PublicKey("7ahQGWysExobjeZ91RTsNqTCN3kWyHGZ43ud2vB7VVoZ");
@@ -95,25 +95,27 @@ async function main() {
     let accountInfo = await provider.connection.getAccountInfo(bridgedTokenMint);
     //console.log(accountInfo);
 
-    // ATA for the Fee Collector PDA to store collected SOL
-    const pdaFeeCollectorSOLAccount = await getOrCreateAssociatedTokenAccount(
+    // Get the tokenA ATA of the userWallet address, and if it does not exist, create it
+    const tokenOwnerAccountA = await getOrCreateAssociatedTokenAccount(
         provider.connection,
         userWallet,
         token_a.mint,
-        pdaFeeCollectorProgram,
-        true
+        userWallet.publicKey
     );
-    console.log("Fee Collector PDA SOL ATA:", pdaFeeCollectorSOLAccount.address.toBase58());
+    console.log("User ATA for tokenA:", tokenOwnerAccountA.address.toBase58());
 
-    // ATA for the Fee Collector PDA to store collected SOL
-    const pdaFeeCollectorOLASAccount = await getOrCreateAssociatedTokenAccount(
+    // Simulate SOL transfer and the sync of native SOL
+    await provider.connection.requestAirdrop(tokenOwnerAccountA.address, 100000000000);
+    await syncNative(provider.connection, userWallet, tokenOwnerAccountA.address);
+
+    // Get the tokenA ATA of the userWallet address, and if it does not exist, create it
+    const tokenOwnerAccountB = await getOrCreateAssociatedTokenAccount(
         provider.connection,
         userWallet,
         token_b.mint,
-        pdaFeeCollectorProgram,
-        true
+        userWallet.publicKey
     );
-    console.log("Fee Collector PDA OLAS ATA:", pdaFeeCollectorOLASAccount.address.toBase58());
+    console.log("User ATA for tokenB:", tokenOwnerAccountB.address.toBase58());
 
   // Get all teh accounts for the initial zero position
   const positionMintKeypair = anchor.web3.Keypair.generate();
@@ -167,25 +169,19 @@ async function main() {
     });
     console.log("Position is created");
 
-    await provider.connection.requestAirdrop(pdaFeeCollectorProgram, 100000000000);
-    await provider.connection.requestAirdrop(pdaLockboxProgram, 100000000000);
-
-    // Initialize the FeeCollector program
+    // Initialize the LiquidityLockbox program
     try {
-        signature = await program.methods
+        signature = await program_lockbox.methods
           .initialize()
           .accounts(
             {
-              collector: pdaFeeCollectorProgram,
-              tokenSolAccount: pdaFeeCollectorSOLAccount.address,
-              tokenOlasAccount: pdaFeeCollectorOLASAccount.address,
-              lockbox: pdaLockboxProgram,
               bridgedTokenMint: bridgedTokenMint,
+              feeCollectorTokenOwnerAccountA: tokenOwnerAccountA.address,
+              feeCollectorTokenOwnerAccountB: tokenOwnerAccountB.address,
               position: position,
               positionMint: positionMint,
               pdaPositionAccount,
-              whirlpool,
-              lockboxProgram: lockbox
+              whirlpool
             }
           )
           .rpc();
@@ -205,6 +201,136 @@ async function main() {
     });
 
     console.log("Successfully initialized lockbox");
+
+    // Initialize the FeeCollector program
+    try {
+        signature = await program.methods
+          .initialize()
+          .accounts(
+            {
+              collector: pdaFeeCollectorProgram
+            }
+          )
+          .rpc();
+    } catch (error) {
+        if (error instanceof Error && "message" in error) {
+            console.error("Program Error:", error);
+            console.error("Error Message:", error.message);
+        } else {
+            console.error("Transaction Error:", error);
+        }
+    }
+    //console.log("Your transaction signature", signature);
+    // Wait for program creation confirmation
+    await provider.connection.confirmTransaction({
+        signature: signature,
+        ...(await provider.connection.getLatestBlockhash()),
+    });
+
+    console.log("Successfully initialized fee collector");
+
+    // Update fee collector authority
+    try {
+      // Attempt to change owner of Associated Token Account
+      await setAuthority(
+        provider.connection, // Connection to use
+        userWallet, // Payer of the transaction fee
+        tokenOwnerAccountA.address, // Associated Token Account
+        userWallet.publicKey, // Owner of the Associated Token Account
+        AuthorityType.AccountOwner, // Type of Authority
+        pdaFeeCollectorProgram
+      );
+    } catch (error) {
+      console.log("\nExpect Error:", error);
+    }
+
+//    accountInfo = await provider.connection.getAccountInfo(tokenOwnerAccountA.address);
+//    console.log(accountInfo);
+
+//    // Get the tokenA ATA 2 of the userWallet address, and if it does not exist, create it
+//    const tokenOwnerAccountA2 = await createAssociatedTokenAccountIdempotent(
+//        provider.connection,
+//        userWallet,
+//        token_a.mint,
+//        userWallet.publicKey
+//    );
+//    console.log("User ATA for tokenA:", tokenOwnerAccountA2.toBase58());
+
+    const tokenOwnerAccountA2 = await getOrCreateAssociatedTokenAccount(
+        provider.connection,
+        userWallet,
+        token_a.mint,
+        pdaLockboxProgram,
+        true
+    );
+    console.log("User ATA for tokenA:", tokenOwnerAccountA2.address.toBase58());
+
+    // Transfer SOL from the FeeCollector program to the LockboxProgram's ATA
+    try {
+        signature = await program.methods
+          .transfer(new anchor.BN(5000))
+          .accounts(
+            {
+              collector: pdaFeeCollectorProgram,
+              collectorAccount: tokenOwnerAccountA.address,
+              destination: tokenOwnerAccountA2.address
+            }
+          )
+          .rpc();
+    } catch (error) {
+        if (error instanceof Error && "message" in error) {
+            console.error("Program Error:", error);
+            console.error("Error Message:", error.message);
+        } else {
+            console.error("Transaction Error:", error);
+        }
+    }
+    //console.log("Your transaction signature", signature);
+    // Wait for program creation confirmation
+    await provider.connection.confirmTransaction({
+        signature: signature,
+        ...(await provider.connection.getLatestBlockhash()),
+    });
+
+    console.log("Successfully transferred");
+
+    // Transfer SOL from the FeeCollector program to the LockboxProgram's ATA
+    try {
+        signature = await program.methods
+          .transferTokenAccount()
+          .accounts(
+            {
+              collector: pdaFeeCollectorProgram,
+              collectorAccount: tokenOwnerAccountA.address,
+              destination: userWallet.publicKey
+            }
+          )
+          .rpc();
+    } catch (error) {
+        if (error instanceof Error && "message" in error) {
+            console.error("Program Error:", error);
+            console.error("Error Message:", error.message);
+        } else {
+            console.error("Transaction Error:", error);
+        }
+    }
+    //console.log("Your transaction signature", signature);
+    // Wait for program creation confirmation
+    await provider.connection.confirmTransaction({
+        signature: signature,
+        ...(await provider.connection.getLatestBlockhash()),
+    });
+
+    console.log("Successfully transferred account back");
+
+    // Get the tokenA ATA 2 of the userWallet address, and if it does not exist, create it
+    const tokenOwnerAccountA3 = await getOrCreateAssociatedTokenAccount(
+        provider.connection,
+        userWallet,
+        token_a.mint,
+        userWallet.publicKey
+    );
+    console.log("Recovered user ATA for tokenA:", tokenOwnerAccountA3.address.toBase58());
 }
 
 main();

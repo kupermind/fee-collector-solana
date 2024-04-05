@@ -1,6 +1,6 @@
 pub mod state;
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Approve};
+use anchor_spl::token::{self, Mint, Token, TokenAccount, Approve, Transfer};
 use liquidity_lockbox::{
   self,
   state::{LiquidityLockbox},
@@ -10,8 +10,14 @@ use whirlpool::{
   self,
   state::{Whirlpool, Position},
 };
-use solana_program::{pubkey::Pubkey, program::invoke_signed};
-use spl_token::instruction::{burn_checked, mint_to};
+use solana_program::{
+  pubkey::Pubkey,
+  program::invoke_signed,
+  bpf_loader_upgradeable::set_upgrade_authority,
+  bpf_loader_upgradeable::upgrade,
+  loader_upgradeable_instruction::UpgradeableLoaderInstruction
+};
+use spl_token::instruction::{transfer, set_authority, AuthorityType};
 pub use state::*;
 
 declare_id!("DWDGo2UkBUFZ3VitBfWRBMvRnHr7E2DSh57NK27xMYaB");
@@ -31,16 +37,6 @@ pub mod fee_collector {
   pub fn initialize(
     ctx: Context<InitializeFeeCollector>
   ) -> Result<()> {
-    // Check that the first token mint is SOL
-    if ctx.accounts.token_sol_account.mint != SOL {
-      return Err(ErrorCode::WrongTokenMint.into());
-    }
-
-    // Check that the second token mint is OLAS
-    if ctx.accounts.token_olas_account.mint != OLAS {
-      return Err(ErrorCode::WrongTokenMint.into());
-    }
-
     // Get the fee collector account
     let collector = &mut ctx.accounts.collector;
 
@@ -52,34 +48,74 @@ pub mod fee_collector {
       bump
     )?;
 
-    // Get fee collector signer seeds
-    let signer_seeds = &[&ctx.accounts.collector.seeds()[..]];
+    Ok(())
+  }
 
+  /// Transfer token funds.
+  pub fn transfer(
+    ctx: Context<TransferFeeCollector>,
+    amount: u64
+  ) -> Result<()> {
+    // Transfer the amount
+    token::transfer(
+        CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.collector_account.to_account_info(),
+                to: ctx.accounts.destination.to_account_info(),
+                authority: ctx.accounts.collector.to_account_info(),
+            },
+            &[&ctx.accounts.collector.seeds()],
+        ),
+        amount,
+    )?;
 
+    Ok(())
+  }
 
-    // CPI call to increase liquidity
-    let cpi_program_lockbox_initialize = ctx.accounts.lockbox_program.to_account_info();
-    let cpi_accounts_lockbox_initialize = InitializeLiquidityLockbox {
-      signer: ctx.accounts.collector.to_account_info(),
-      lockbox: ctx.accounts.lockbox.to_account_info(),
-      bridged_token_mint: ctx.accounts.bridged_token_mint.to_account_info(),
-      fee_collector_token_owner_account_a: ctx.accounts.token_sol_account.to_account_info(),
-      fee_collector_token_owner_account_b: ctx.accounts.token_olas_account.to_account_info(),
-      position: ctx.accounts.position.to_account_info(),
-      position_mint: ctx.accounts.position_mint.to_account_info(),
-      pda_position_account: ctx.accounts.pda_position_account.to_account_info(),
-      whirlpool: ctx.accounts.whirlpool.to_account_info(),
-      token_program: ctx.accounts.token_program.to_account_info(),
-      system_program: ctx.accounts.system_program.to_account_info(),
-      rent: ctx.accounts.rent.to_account_info(),
-    };
+  /// Transfer token account.
+  pub fn transfer_token_account(
+    ctx: Context<TransferTokenAccountFeeCollector>
+  ) -> Result<()> {
+    // Transfer the token associated account
+    invoke_signed(
+        &set_authority(
+            ctx.accounts.token_program.key,
+            ctx.accounts.collector_account.to_account_info().key,
+            Some(ctx.accounts.destination.to_account_info().key),
+            AuthorityType::AccountOwner,
+            ctx.accounts.collector.to_account_info().key,
+            &[ctx.accounts.collector.to_account_info().key],
+        )?,
+        &[
+            ctx.accounts.collector_account.to_account_info(),
+            ctx.accounts.collector.to_account_info(),
+            ctx.accounts.token_program.to_account_info(),
+        ],
+        &[&ctx.accounts.collector.seeds()],
+    )?;
 
-    let cpi_ctx_lockbox_initialize = CpiContext::new_with_signer(
-      cpi_program_lockbox_initialize,
-      cpi_accounts_lockbox_initialize,
-      signer_seeds
-    );
-    liquidity_lockbox::cpi::initialize(cpi_ctx_lockbox_initialize)?;
+    Ok(())
+  }
+
+  /// Transfer token account.
+  pub fn change_upgrade_authority(
+    ctx: Context<ChangeUpgradeAuthorityFeeCollector>
+  ) -> Result<()> {
+    // Transfer the token associated account
+    invoke_signed(
+        &set_upgrade_authority(
+            ctx.accounts.program_to_update_authority.to_account_info().key,
+            ctx.accounts.collector.to_account_info().key,
+            Some(ctx.accounts.destination.to_account_info().key)
+        ),
+        &[
+            ctx.accounts.program_data_to_update_authority.to_account_info(),
+            ctx.accounts.collector.to_account_info(),
+            ctx.accounts.destination.to_account_info()
+        ],
+        &[&ctx.accounts.collector.seeds()]
+    )?;
 
     Ok(())
   }
@@ -100,32 +136,69 @@ pub struct InitializeFeeCollector<'info> {
   )]
   pub collector: Box<Account<'info, FeeCollector>>,
 
-
-  #[account(constraint = collector.key() == token_sol_account.owner,
-    constraint = token_sol_account.mint != token_olas_account.mint
-  )]
-  pub token_sol_account: Box<Account<'info, TokenAccount>>,
-
-  #[account(constraint = collector.key() == token_olas_account.owner)]
-  pub token_olas_account: Box<Account<'info, TokenAccount>>,
-
-  //#[account(constraint = lockbox.to_account_info().owner == &lockbox_program.key())]
-  /// CHECK: Check later
-  #[account(mut)]
-  pub lockbox: UncheckedAccount<'info>,
-  // All of the following account are checked in the Liquidity Lockbox program initialization
-  pub bridged_token_mint: Box<Account<'info, Mint>>,
-  pub position: Box<Account<'info, Position>>,
-  pub position_mint: Box<Account<'info, Mint>>,
-  #[account(mut)]
-  pub pda_position_account: Box<Account<'info, TokenAccount>>,
-  pub whirlpool: Box<Account<'info, Whirlpool>>,
-  pub lockbox_program: Program<'info, liquidity_lockbox::program::LiquidityLockbox>,
-
-  #[account(address = token::ID)]
-  pub token_program: Program<'info, Token>,
   pub system_program: Program<'info, System>,
   pub rent: Sysvar<'info, Rent>
+}
+
+#[derive(Accounts)]
+pub struct TransferFeeCollector<'info> {
+  #[account(mut)]
+  pub signer: Signer<'info>,
+
+  #[account(mut)]
+  pub collector: Box<Account<'info, FeeCollector>>,
+
+  #[account(mut)]
+  pub collector_account: Box<Account<'info, TokenAccount>>,
+
+  #[account(mut)]
+  pub destination: Box<Account<'info, TokenAccount>>,
+
+  #[account(address = token::ID)]
+  pub token_program: Program<'info, Token>
+}
+
+#[derive(Accounts)]
+pub struct TransferTokenAccountFeeCollector<'info> {
+  #[account(mut)]
+  pub signer: Signer<'info>,
+
+  #[account(mut)]
+  pub collector: Box<Account<'info, FeeCollector>>,
+
+  #[account(mut)]
+  pub collector_account: Box<Account<'info, TokenAccount>>,
+
+  /// CHECK: Check later
+  #[account(mut)]
+  pub destination: UncheckedAccount<'info>,
+
+  #[account(address = token::ID)]
+  pub token_program: Program<'info, Token>
+}
+
+#[derive(Accounts)]
+pub struct ChangeUpgradeAuthorityFeeCollector<'info> {
+  #[account(mut)]
+  pub signer: Signer<'info>,
+
+  /// CHECK: Check later
+  #[account(mut)]
+  pub program_to_update_authority: UncheckedAccount<'info>,
+
+  /// CHECK: Check later
+  #[account(mut)]
+  pub program_data_to_update_authority: UncheckedAccount<'info>,
+
+  #[account(mut)]
+  pub collector: Box<Account<'info, FeeCollector>>,
+
+  /// CHECK: Check later
+  #[account(mut)]
+  pub destination: UncheckedAccount<'info>,
+
+  /// CHECK: Check later
+  pub bpf_loader: UncheckedAccount<'info>
 }
 
 
