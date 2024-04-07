@@ -17,6 +17,7 @@ import { DecimalUtil, Percentage } from "@orca-so/common-sdk";
 import Decimal from "decimal.js";
 import expect from "expect";
 import fs from "fs";
+import bs58 from "bs58";
 
 // UNIX/Linux/Mac
 // bash$ export ANCHOR_PROVIDER_URL=http://127.0.0.1:8899
@@ -121,6 +122,7 @@ async function main() {
 //  // SetAuthority instruction for the multisig
 //  const setAuthorityInstruction = await createSetAuthorityInstruction(tokenOwnerAccountA.address, userWallet.publicKey,
 //    AuthorityType.AccountOwner, pdaFeeCollectorProgram);
+//  console.log(bs58.encode(setAuthorityInstruction.data));
 //  console.log(Buffer.from(setAuthorityInstruction.data).toString("base64"));
 //  return;
 
