@@ -5,7 +5,8 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import {
   createMint, mintTo, transfer, getOrCreateAssociatedTokenAccount, syncNative, createAssociatedTokenAccount,
-  unpackAccount, TOKEN_PROGRAM_ID, AccountLayout, getAssociatedTokenAddress, setAuthority, AuthorityType
+  unpackAccount, TOKEN_PROGRAM_ID, AccountLayout, getAssociatedTokenAddress, setAuthority, AuthorityType,
+  createSetAuthorityInstruction
 } from "@solana/spl-token";
 import {
   WhirlpoolContext, buildWhirlpoolClient, ORCA_WHIRLPOOL_PROGRAM_ID,
@@ -26,7 +27,7 @@ async function main() {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
-  const PROGRAM_ID = new anchor.web3.PublicKey("tQTEADxm7KkqPiMJUqEixAxdYNrwmftTvqvyCC69qZz");
+  const PROGRAM_ID = new anchor.web3.PublicKey("DWDGo2UkBUFZ3VitBfWRBMvRnHr7E2DSh57NK27xMYaB");
   const program = new Program(idl as anchor.Idl, PROGRAM_ID, anchor.getProvider());
 
   const lockbox = new anchor.web3.PublicKey("7ahQGWysExobjeZ91RTsNqTCN3kWyHGZ43ud2vB7VVoZ");
@@ -116,6 +117,12 @@ async function main() {
         userWallet.publicKey
     );
     console.log("User ATA for tokenB:", tokenOwnerAccountB.address.toBase58());
+
+// SetAuthority instruction for the multisig
+//  const setAuthorityInstruction = await createSetAuthorityInstruction(tokenOwnerAccountA.address, userWallet.publicKey,
+//    AuthorityType.AccountOwner, pdaFeeCollectorProgram);
+//  console.log(setAuthorityInstruction);
+//  return;
 
   // Get all teh accounts for the initial zero position
   const positionMintKeypair = anchor.web3.Keypair.generate();
@@ -229,13 +236,27 @@ async function main() {
 
     console.log("Successfully initialized fee collector");
 
-    // Update fee collector authority
+    // Update fee collectors authority
     try {
       // Attempt to change owner of Associated Token Account
       await setAuthority(
         provider.connection, // Connection to use
         userWallet, // Payer of the transaction fee
         tokenOwnerAccountA.address, // Associated Token Account
+        userWallet.publicKey, // Owner of the Associated Token Account
+        AuthorityType.AccountOwner, // Type of Authority
+        pdaFeeCollectorProgram
+      );
+    } catch (error) {
+      console.log("\nExpect Error:", error);
+    }
+
+    try {
+      // Attempt to change owner of Associated Token Account
+      await setAuthority(
+        provider.connection, // Connection to use
+        userWallet, // Payer of the transaction fee
+        tokenOwnerAccountB.address, // Associated Token Account
         userWallet.publicKey, // Owner of the Associated Token Account
         AuthorityType.AccountOwner, // Type of Authority
         pdaFeeCollectorProgram
@@ -263,7 +284,7 @@ async function main() {
         pdaLockboxProgram,
         true
     );
-    console.log("User ATA for tokenA:", tokenOwnerAccountA2.address.toBase58());
+    console.log("User ATA2 for tokenA:", tokenOwnerAccountA2.address.toBase58());
 
     // Transfer SOL from the FeeCollector program to the LockboxProgram's ATA
     try {
@@ -273,7 +294,7 @@ async function main() {
             {
               collector: pdaFeeCollectorProgram,
               collectorAccount: tokenOwnerAccountA.address,
-              destination: tokenOwnerAccountA2.address
+              destinationAccount: tokenOwnerAccountA2.address
             }
           )
           .rpc();
@@ -297,11 +318,12 @@ async function main() {
     // Transfer SOL from the FeeCollector program to the LockboxProgram's ATA
     try {
         signature = await program.methods
-          .transferTokenAccount()
+          .transferTokenAccounts()
           .accounts(
             {
               collector: pdaFeeCollectorProgram,
-              collectorAccount: tokenOwnerAccountA.address,
+              collectorAccountSol: tokenOwnerAccountA.address,
+              collectorAccountOlas: tokenOwnerAccountB.address,
               destination: userWallet.publicKey
             }
           )

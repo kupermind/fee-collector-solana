@@ -145,7 +145,7 @@ pub mod fee_collector {
             Some(ctx.accounts.destination.to_account_info().key),
             AuthorityType::AccountOwner,
             ctx.accounts.collector.to_account_info().key,
-            &[ctx.accounts.collector.to_account_info().key],
+            &[],
         )?,
         &[
             ctx.accounts.collector_account_sol.to_account_info(),
@@ -163,7 +163,7 @@ pub mod fee_collector {
             Some(ctx.accounts.destination.to_account_info().key),
             AuthorityType::AccountOwner,
             ctx.accounts.collector.to_account_info().key,
-            &[ctx.accounts.collector.to_account_info().key],
+            &[],
         )?,
         &[
             ctx.accounts.collector_account_olas.to_account_info(),
