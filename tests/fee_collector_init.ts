@@ -118,10 +118,10 @@ async function main() {
     );
     console.log("User ATA for tokenB:", tokenOwnerAccountB.address.toBase58());
 
-// SetAuthority instruction for the multisig
+//  // SetAuthority instruction for the multisig
 //  const setAuthorityInstruction = await createSetAuthorityInstruction(tokenOwnerAccountA.address, userWallet.publicKey,
 //    AuthorityType.AccountOwner, pdaFeeCollectorProgram);
-//  console.log(setAuthorityInstruction);
+//  console.log(Buffer.from(setAuthorityInstruction.data).toString("base64"));
 //  return;
 
   // Get all teh accounts for the initial zero position
