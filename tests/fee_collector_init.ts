@@ -5,8 +5,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import {
   createMint, mintTo, transfer, getOrCreateAssociatedTokenAccount, syncNative, createAssociatedTokenAccount,
-  unpackAccount, TOKEN_PROGRAM_ID, AccountLayout, getAssociatedTokenAddress, setAuthority, AuthorityType,
-  createSetAuthorityInstruction
+  unpackAccount, TOKEN_PROGRAM_ID, AccountLayout, getAssociatedTokenAddress, setAuthority, AuthorityType
 } from "@solana/spl-token";
 import {
   WhirlpoolContext, buildWhirlpoolClient, ORCA_WHIRLPOOL_PROGRAM_ID,
@@ -118,13 +117,6 @@ async function main() {
         userWallet.publicKey
     );
     console.log("User ATA for tokenB:", tokenOwnerAccountB.address.toBase58());
-
-//  // SetAuthority instruction for the multisig
-//  const setAuthorityInstruction = await createSetAuthorityInstruction(tokenOwnerAccountA.address, userWallet.publicKey,
-//    AuthorityType.AccountOwner, pdaFeeCollectorProgram);
-//  console.log(bs58.encode(setAuthorityInstruction.data));
-//  console.log(Buffer.from(setAuthorityInstruction.data).toString("base64"));
-//  return;
 
   // Get all teh accounts for the initial zero position
   const positionMintKeypair = anchor.web3.Keypair.generate();
