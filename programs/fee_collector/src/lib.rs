@@ -11,6 +11,10 @@ use solana_program::{
 };
 use spl_token::instruction::{set_authority, AuthorityType};
 pub use state::*;
+// pub use message::*;
+//
+// pub mod message;
+// pub mod state;
 
 declare_id!("DWDGo2UkBUFZ3VitBfWRBMvRnHr7E2DSh57NK27xMYaB");
 
@@ -26,16 +30,44 @@ pub mod fee_collector {
 
   /// Initializes a Lockbox account that stores state data.
   pub fn initialize(
-    ctx: Context<InitializeFeeCollector>
+    ctx: Context<InitializeFeeCollector>,
+      chain: u16,
+      address: [u8; 32],
   ) -> Result<()> {
+  // Foreign emitter cannot share the same Wormhole Chain ID as the
+  // Solana Wormhole program's. And cannot register a zero address.
+  require!(
+      chain > 0 && chain != wormhole::CHAIN_ID_SOLANA && !address.iter().all(|&x| x == 0),
+      ErrorCode::InvalidForeignEmitter,
+  );
+
     // Get the fee collector account
     let collector = &mut ctx.accounts.collector;
 
-    // Get the anchor-derived bump
-    let bump = *ctx.bumps.get("collector").unwrap();
+    // TODO Owner is not needed, hardcode it as a Timelock during the initialization
+    // Set the owner of the config (effectively the owner of the program).
+    config.owner = ctx.accounts.owner.key();
 
-    // Initialize lockbox account
+    // config.wormhole is not needed (for sending only)
+
+    // Set default values for posting Wormhole messages.
+    //
+    // Zero means no batching.
+    config.batch_id = 0;
+
+    // Anchor IDL default coder cannot handle wormhole::Finality enum,
+    // so this value is stored as u8.
+    config.finality = wormhole::Finality::Confirmed as u8;
+
+    // TODO Make this in a better way as a constant withing the state
+    // Get the anchor-derived bump
+    let bump = *ctx.bumps.get("collector").ok_or(ErrorCode::BumpNotFound)?;
+
+    // TODO Chain and address are for foreign_emitter - set it during the initialization
+    // Initialize Lockbox manager account
     collector.initialize(
+      chain,
+      address,
       bump
     )?;
 
@@ -224,6 +256,38 @@ pub mod fee_collector {
 
     Ok(())
   }
+
+//     /// This instruction reads a posted verified Wormhole message and verifies
+//     /// that the payload is of type [HelloWorldMessage::Hello] (payload ID == 1). HelloWorldMessage
+//     /// data is stored in a [Received] account.
+//     ///
+//     /// See [HelloWorldMessage] enum for deserialization implementation.
+//     ///
+//     /// # Arguments
+//     ///
+//     /// * `vaa_hash` - Keccak256 hash of verified Wormhole message
+//     pub fn receive_message(ctx: Context<ReceiveMessage>, vaa_hash: [u8; 32]) -> Result<()> {
+//         let posted_message = &ctx.accounts.posted;
+//
+//         if let HelloWorldMessage::Hello { message } = posted_message.data() {
+//             // HelloWorldMessage cannot be larger than the maximum size of the account.
+//             require!(
+//                 message.len() <= MESSAGE_MAX_LENGTH,
+//                 HelloWorldError::InvalidMessage,
+//             );
+//
+//             // Save batch ID, keccak256 hash and message payload.
+//             let received = &mut ctx.accounts.received;
+//             received.batch_id = posted_message.batch_id();
+//             received.wormhole_message_hash = vaa_hash;
+//             received.message = message.clone();
+//
+//             // Done
+//             Ok(())
+//         } else {
+//             Err(HelloWorldError::InvalidMessage.into())
+//         }
+//     }
 }
 
 #[derive(Accounts)]
@@ -364,6 +428,10 @@ pub struct UpgradeProgramFeeCollector<'info> {
 
 #[error_code]
 pub enum ErrorCode {
+  #[msg("Invalid foreign emitter")]
+  InvalidForeignEmitter,
+  #[msg("Bump not found")]
+  BumpNotFound,
   #[msg("Wrong token mint")]
   WrongTokenMint,
 }
