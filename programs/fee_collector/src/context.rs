@@ -118,6 +118,9 @@ pub struct ReceiveMessage<'info> {
     /// (chain ID). Read-only.
     pub foreign_emitter: Account<'info, ForeignEmitter>,
 
+//     constraint = fee_collector.verify(posted.emitter_address()) @ HelloWorldError::InvalidForeignEmitter
+//     pub fee_collector: Account<'info, FeeCollector>,
+
     #[account(
         init,
         payer = payer,
