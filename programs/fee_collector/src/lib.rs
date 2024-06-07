@@ -266,37 +266,37 @@ pub mod lockbox_governor {
     Ok(())
   }
 
-//     /// This instruction reads a posted verified Wormhole message and verifies
-//     /// that the payload is of type [HelloWorldMessage::Hello] (payload ID == 1). HelloWorldMessage
-//     /// data is stored in a [Received] account.
-//     ///
-//     /// See [HelloWorldMessage] enum for deserialization implementation.
-//     ///
-//     /// # Arguments
-//     ///
-//     /// * `vaa_hash` - Keccak256 hash of verified Wormhole message
-//     pub fn receive_message(ctx: Context<ReceiveMessage>, vaa_hash: [u8; 32]) -> Result<()> {
-//         let posted_message = &ctx.accounts.posted;
-//
-//         if let HelloWorldMessage::Hello { message } = posted_message.data() {
-//             // HelloWorldMessage cannot be larger than the maximum size of the account.
-//             require!(
-//                 message.len() <= MESSAGE_MAX_LENGTH,
-//                 HelloWorldError::InvalidMessage,
-//             );
-//
-//             // Save batch ID, keccak256 hash and message payload.
-//             let received = &mut ctx.accounts.received;
-//             received.batch_id = posted_message.batch_id();
-//             received.wormhole_message_hash = vaa_hash;
-//             received.message = message.clone();
-//
-//             // Done
-//             Ok(())
-//         } else {
-//             Err(HelloWorldError::InvalidMessage.into())
-//         }
-//     }
+    /// This instruction reads a posted verified Wormhole message and verifies
+    /// that the payload is of type [HelloWorldMessage::Hello] (payload ID == 1). HelloWorldMessage
+    /// data is stored in a [Received] account.
+    ///
+    /// See [HelloWorldMessage] enum for deserialization implementation.
+    ///
+    /// # Arguments
+    ///
+    /// * `vaa_hash` - Keccak256 hash of verified Wormhole message
+    pub fn receive_message(ctx: Context<ReceiveMessage>, vaa_hash: [u8; 32]) -> Result<()> {
+        let posted_message = &ctx.accounts.posted;
+
+        if let HelloWorldMessage::Hello { message } = posted_message.data() {
+            // HelloWorldMessage cannot be larger than the maximum size of the account.
+            require!(
+                message.len() <= MESSAGE_MAX_LENGTH,
+                HelloWorldError::InvalidMessage,
+            );
+
+            // Save batch ID, keccak256 hash and message payload.
+            let received = &mut ctx.accounts.received;
+            received.batch_id = posted_message.batch_id();
+            received.wormhole_message_hash = vaa_hash;
+            received.message = message.clone();
+
+            // Done
+            Ok(())
+        } else {
+            Err(HelloWorldError::InvalidMessage.into())
+        }
+    }
 }
 
 #[derive(Accounts)]
