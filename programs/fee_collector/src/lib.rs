@@ -1,4 +1,3 @@
-pub mod state;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 use solana_program::{
@@ -10,16 +9,21 @@ use solana_program::{
   sysvar
 };
 use spl_token::instruction::{set_authority, AuthorityType};
+
+pub use context::*;
+pub use error::*;
+pub use message::*;
 pub use state::*;
-// pub use message::*;
-//
-// pub mod message;
-// pub mod state;
+
+pub mod context;
+pub mod error;
+pub mod message;
+pub mod state;
 
 declare_id!("DWDGo2UkBUFZ3VitBfWRBMvRnHr7E2DSh57NK27xMYaB");
 
 #[program]
-pub mod fee_collector {
+pub mod lockbox_governor {
   use super::*;
   use solana_program::pubkey;
 
@@ -30,9 +34,9 @@ pub mod fee_collector {
 
   /// Initializes a Lockbox account that stores state data.
   pub fn initialize(
-    ctx: Context<InitializeFeeCollector>,
+    ctx: Context<InitializeLockboxGovernor>,
       chain: u16,
-      address: [u8; 32],
+      timelock: [u8; 32],
   ) -> Result<()> {
   // Foreign emitter cannot share the same Wormhole Chain ID as the
   // Solana Wormhole program's. And cannot register a zero address.
@@ -41,8 +45,8 @@ pub mod fee_collector {
       ErrorCode::InvalidForeignEmitter,
   );
 
-    // Get the fee collector account
-    let collector = &mut ctx.accounts.collector;
+    // Get the fee governor account
+    let governor = &mut ctx.accounts.governor;
 
     // TODO Owner is not needed, hardcode it as a Timelock during the initialization
     // Set the owner of the config (effectively the owner of the program).
@@ -61,13 +65,13 @@ pub mod fee_collector {
 
     // TODO Make this in a better way as a constant withing the state
     // Get the anchor-derived bump
-    let bump = *ctx.bumps.get("collector").ok_or(ErrorCode::BumpNotFound)?;
+    let bump = *ctx.bumps.get("governor").ok_or(ErrorCode::BumpNotFound)?;
 
     // TODO Chain and address are for foreign_emitter - set it during the initialization
     // Initialize Lockbox manager account
-    collector.initialize(
+    governor.initialize(
       chain,
-      address,
+      timelock,
       bump
     )?;
 
@@ -76,14 +80,14 @@ pub mod fee_collector {
 
   /// Transfer token funds.
   pub fn transfer(
-    ctx: Context<TransferFeeCollector>,
+    ctx: Context<TransferLockboxGovernor>,
     amount: u64
   ) -> Result<()> {
     // Check that the token mint is SOL or OLAS
     if ctx.accounts.collector_account.mint == SOL && ctx.accounts.destination_account.mint == SOL {
-      ctx.accounts.collector.total_sol_transferred += amount;
+      ctx.accounts.governor.total_sol_transferred += amount;
     } else if ctx.accounts.collector_account.mint == OLAS && ctx.accounts.destination_account.mint == OLAS {
-      ctx.accounts.collector.total_olas_transferred += amount;
+      ctx.accounts.governor.total_olas_transferred += amount;
     } else {
       return Err(ErrorCode::WrongTokenMint.into());
     }
@@ -95,9 +99,9 @@ pub mod fee_collector {
             Transfer {
                 from: ctx.accounts.collector_account.to_account_info(),
                 to: ctx.accounts.destination_account.to_account_info(),
-                authority: ctx.accounts.collector.to_account_info(),
+                authority: ctx.accounts.governor.to_account_info(),
             },
-            &[&ctx.accounts.collector.seeds()],
+            &[&ctx.accounts.governor.seeds()],
         ),
         amount
     )?;
@@ -107,7 +111,7 @@ pub mod fee_collector {
 
   /// Transfer token funds.
   pub fn transfer_all(
-    ctx: Context<TransferAllFeeCollector>
+    ctx: Context<TransferAllLockboxGovernor>
   ) -> Result<()> {
     // Check that the first token mint is SOL
     if ctx.accounts.collector_account_sol.mint != SOL || ctx.accounts.destination_account_sol.mint != SOL {
@@ -131,9 +135,9 @@ pub mod fee_collector {
             Transfer {
                 from: ctx.accounts.collector_account_sol.to_account_info(),
                 to: ctx.accounts.destination_account_sol.to_account_info(),
-                authority: ctx.accounts.collector.to_account_info(),
+                authority: ctx.accounts.governor.to_account_info(),
             },
-            &[&ctx.accounts.collector.seeds()],
+            &[&ctx.accounts.governor.seeds()],
         ),
         amount_sol,
     )?;
@@ -145,9 +149,9 @@ pub mod fee_collector {
             Transfer {
                 from: ctx.accounts.collector_account_olas.to_account_info(),
                 to: ctx.accounts.destination_account_olas.to_account_info(),
-                authority: ctx.accounts.collector.to_account_info(),
+                authority: ctx.accounts.governor.to_account_info(),
             },
-            &[&ctx.accounts.collector.seeds()],
+            &[&ctx.accounts.governor.seeds()],
         ),
         amount_olas,
     )?;
@@ -157,7 +161,7 @@ pub mod fee_collector {
 
   /// Transfer token account.
   pub fn transfer_token_accounts(
-    ctx: Context<TransferTokenAccountsFeeCollector>
+    ctx: Context<TransferTokenAccountsLockboxGovernor>
   ) -> Result<()> {
     // Check that the first token mint is SOL
     if ctx.accounts.collector_account_sol.mint != SOL {
@@ -176,15 +180,15 @@ pub mod fee_collector {
             ctx.accounts.collector_account_sol.to_account_info().key,
             Some(ctx.accounts.destination.to_account_info().key),
             AuthorityType::AccountOwner,
-            ctx.accounts.collector.to_account_info().key,
+            ctx.accounts.governor.to_account_info().key,
             &[],
         )?,
         &[
             ctx.accounts.collector_account_sol.to_account_info(),
-            ctx.accounts.collector.to_account_info(),
+            ctx.accounts.governor.to_account_info(),
             ctx.accounts.token_program.to_account_info(),
         ],
-        &[&ctx.accounts.collector.seeds()],
+        &[&ctx.accounts.governor.seeds()],
     )?;
 
     // Transfer OLAS token associated account
@@ -194,15 +198,15 @@ pub mod fee_collector {
             ctx.accounts.collector_account_olas.to_account_info().key,
             Some(ctx.accounts.destination.to_account_info().key),
             AuthorityType::AccountOwner,
-            ctx.accounts.collector.to_account_info().key,
+            ctx.accounts.governor.to_account_info().key,
             &[],
         )?,
         &[
             ctx.accounts.collector_account_olas.to_account_info(),
-            ctx.accounts.collector.to_account_info(),
+            ctx.accounts.governor.to_account_info(),
             ctx.accounts.token_program.to_account_info(),
         ],
-        &[&ctx.accounts.collector.seeds()],
+        &[&ctx.accounts.governor.seeds()],
     )?;
 
     Ok(())
@@ -210,21 +214,21 @@ pub mod fee_collector {
 
   /// Change upgrade authority.
   pub fn change_upgrade_authority(
-    ctx: Context<ChangeUpgradeAuthorityFeeCollector>
+    ctx: Context<ChangeUpgradeAuthorityLockboxGovernor>
   ) -> Result<()> {
     // Change upgrade authority
     invoke_signed(
         &set_upgrade_authority(
             ctx.accounts.program_to_update_authority.to_account_info().key,
-            ctx.accounts.collector.to_account_info().key,
+            ctx.accounts.governor.to_account_info().key,
             Some(ctx.accounts.destination.to_account_info().key)
         ),
         &[
             ctx.accounts.program_data_to_update_authority.to_account_info(),
-            ctx.accounts.collector.to_account_info(),
+            ctx.accounts.governor.to_account_info(),
             ctx.accounts.destination.to_account_info()
         ],
-        &[&ctx.accounts.collector.seeds()]
+        &[&ctx.accounts.governor.seeds()]
     )?;
 
     Ok(())
@@ -232,14 +236,14 @@ pub mod fee_collector {
 
   /// Upgrade the program.
   pub fn upgrade_program(
-    ctx: Context<UpgradeProgramFeeCollector>
+    ctx: Context<UpgradeProgramLockboxGovernor>
   ) -> Result<()> {
     // Transfer the token associated account
     invoke_signed(
         &upgrade(
             ctx.accounts.program_address.to_account_info().key,
             ctx.accounts.buffer_address.to_account_info().key,
-            ctx.accounts.collector.to_account_info().key,
+            ctx.accounts.governor.to_account_info().key,
             ctx.accounts.spill_address.to_account_info().key
         ),
         &[
@@ -249,9 +253,9 @@ pub mod fee_collector {
             ctx.accounts.spill_address.to_account_info(),
             ctx.accounts.rent.to_account_info(),
             ctx.accounts.clock.to_account_info(),
-            ctx.accounts.collector.to_account_info()
+            ctx.accounts.governor.to_account_info()
         ],
-        &[&ctx.accounts.collector.seeds()]
+        &[&ctx.accounts.governor.seeds()]
     )?;
 
     Ok(())
@@ -291,19 +295,19 @@ pub mod fee_collector {
 }
 
 #[derive(Accounts)]
-pub struct InitializeFeeCollector<'info> {
+pub struct InitializeLockboxGovernor<'info> {
   #[account(mut)]
   pub signer: Signer<'info>,
 
   #[account(init,
     seeds = [
-      b"fee_collector".as_ref()
+      b"lockbox_governor".as_ref()
     ],
     bump,
     payer = signer,
-    space = FeeCollector::LEN
+    space = LockboxGovernor::LEN
   )]
-  pub collector: Box<Account<'info, FeeCollector>>,
+  pub governor: Box<Account<'info, LockboxGovernor>>,
 
   #[account(address = system_program::ID)]
   pub system_program: Program<'info, System>,
@@ -312,12 +316,12 @@ pub struct InitializeFeeCollector<'info> {
 }
 
 #[derive(Accounts)]
-pub struct TransferFeeCollector<'info> {
+pub struct TransferLockboxGovernor<'info> {
   #[account(mut)]
   pub signer: Signer<'info>,
 
   #[account(mut)]
-  pub collector: Box<Account<'info, FeeCollector>>,
+  pub governor: Box<Account<'info, LockboxGovernor>>,
 
   #[account(mut)]
   pub collector_account: Box<Account<'info, TokenAccount>>,
@@ -330,12 +334,12 @@ pub struct TransferFeeCollector<'info> {
 }
 
 #[derive(Accounts)]
-pub struct TransferAllFeeCollector<'info> {
+pub struct TransferAllLockboxGovernor<'info> {
   #[account(mut)]
   pub signer: Signer<'info>,
 
   #[account(mut)]
-  pub collector: Box<Account<'info, FeeCollector>>,
+  pub governor: Box<Account<'info, LockboxGovernor>>,
 
   #[account(mut)]
   pub collector_account_sol: Box<Account<'info, TokenAccount>>,
@@ -354,12 +358,12 @@ pub struct TransferAllFeeCollector<'info> {
 }
 
 #[derive(Accounts)]
-pub struct TransferTokenAccountsFeeCollector<'info> {
+pub struct TransferTokenAccountsLockboxGovernor<'info> {
   #[account(mut)]
   pub signer: Signer<'info>,
 
   #[account(mut)]
-  pub collector: Box<Account<'info, FeeCollector>>,
+  pub governor: Box<Account<'info, LockboxGovernor>>,
 
   #[account(mut)]
   pub collector_account_sol: Box<Account<'info, TokenAccount>>,
@@ -376,7 +380,7 @@ pub struct TransferTokenAccountsFeeCollector<'info> {
 }
 
 #[derive(Accounts)]
-pub struct ChangeUpgradeAuthorityFeeCollector<'info> {
+pub struct ChangeUpgradeAuthorityLockboxGovernor<'info> {
   #[account(mut)]
   pub signer: Signer<'info>,
 
@@ -389,7 +393,7 @@ pub struct ChangeUpgradeAuthorityFeeCollector<'info> {
   pub program_data_to_update_authority: UncheckedAccount<'info>,
 
   #[account(mut)]
-  pub collector: Box<Account<'info, FeeCollector>>,
+  pub governor: Box<Account<'info, LockboxGovernor>>,
 
   /// CHECK: Check later
   #[account(mut)]
@@ -397,7 +401,7 @@ pub struct ChangeUpgradeAuthorityFeeCollector<'info> {
 }
 
 #[derive(Accounts)]
-pub struct UpgradeProgramFeeCollector<'info> {
+pub struct UpgradeProgramLockboxGovernor<'info> {
   #[account(mut)]
   pub signer: Signer<'info>,
 
@@ -417,7 +421,7 @@ pub struct UpgradeProgramFeeCollector<'info> {
   pub spill_address: Box<Account<'info, TokenAccount>>,
 
   #[account(mut)]
-  pub collector: Box<Account<'info, FeeCollector>>,
+  pub governor: Box<Account<'info, LockboxGovernor>>,
 
   #[account(address = sysvar::rent::ID)]
   pub rent: Sysvar<'info, Rent>,

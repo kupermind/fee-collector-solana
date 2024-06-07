@@ -40,42 +40,6 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(chain: u16)]
-pub struct RegisterEmitter<'info> {
-    #[account(mut)]
-    /// Owner of the program set in the [`Config`] account. Signer for creating
-    /// the [`ForeignEmitter`] account.
-    pub owner: Signer<'info>,
-
-    #[account(
-        has_one = owner @ HelloWorldError::OwnerOnly,
-        seeds = [Config::SEED_PREFIX],
-        bump
-    )]
-    /// Config account. This program requires that the `owner` specified in the
-    /// context equals the pubkey specified in this account. Read-only.
-    pub config: Account<'info, Config>,
-
-    #[account(
-        init_if_needed,
-        payer = owner,
-        seeds = [
-            ForeignEmitter::SEED_PREFIX,
-            &chain.to_le_bytes()[..]
-        ],
-        bump,
-        space = ForeignEmitter::MAXIMUM_SIZE
-    )]
-    /// Foreign Emitter account. Create this account if an emitter has not been
-    /// registered yet for this Wormhole chain ID. If there already is an
-    /// emitter address saved in this account, overwrite it.
-    pub foreign_emitter: Account<'info, ForeignEmitter>,
-
-    /// System program.
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
 #[instruction(vaa_hash: [u8; 32])]
 pub struct ReceiveMessage<'info> {
     #[account(mut)]
@@ -106,20 +70,10 @@ pub struct ReceiveMessage<'info> {
     pub posted: Account<'info, wormhole::PostedVaa<HelloWorldMessage>>,
 
     #[account(
-        seeds = [
-            ForeignEmitter::SEED_PREFIX,
-            &posted.emitter_chain().to_le_bytes()[..]
-        ],
-        bump,
-        constraint = foreign_emitter.verify(posted.emitter_address()) @ HelloWorldError::InvalidForeignEmitter
+        constraint = governor.verify(posted.emitter_address()) @ HelloWorldError::InvalidForeignEmitter,
+        constraint = &posted.emitter_chain() == governor.chain
     )]
-    /// Foreign emitter account. The posted message's `emitter_address` must
-    /// agree with the one we have registered for this message's `emitter_chain`
-    /// (chain ID). Read-only.
-    pub foreign_emitter: Account<'info, ForeignEmitter>,
-
-//     constraint = fee_collector.verify(posted.emitter_address()) @ HelloWorldError::InvalidForeignEmitter
-//     pub fee_collector: Account<'info, FeeCollector>,
+    pub governor: Account<'info, LockboxGovernor>,
 
     #[account(
         init,
