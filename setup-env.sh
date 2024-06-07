@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Clean everything: rm -rf ../../.local/share/solana && rm -rf ../../.cache/solana
+
 RUSTVER="1.78"
 SOLANAVER="1.18.5"
 ANCHORVER="0.29.0"

@@ -26,6 +26,8 @@ declare_id!("DWDGo2UkBUFZ3VitBfWRBMvRnHr7E2DSh57NK27xMYaB");
 pub mod lockbox_governor {
   use super::*;
   use solana_program::pubkey;
+  //use anchor_lang::solana_program;
+  use wormhole_anchor_sdk::wormhole;
 
   // SOL address
   const SOL: Pubkey = pubkey!("So11111111111111111111111111111111111111112");
@@ -41,12 +43,15 @@ pub mod lockbox_governor {
   // Foreign emitter cannot share the same Wormhole Chain ID as the
   // Solana Wormhole program's. And cannot register a zero address.
   require!(
-      chain > 0 && chain != wormhole::CHAIN_ID_SOLANA && !address.iter().all(|&x| x == 0),
+      chain > 0 && chain != wormhole::CHAIN_ID_SOLANA && !timelock.iter().all(|&x| x == 0),
       ErrorCode::InvalidForeignEmitter,
   );
 
     // Get the fee governor account
     let governor = &mut ctx.accounts.governor;
+
+    // Get the config account
+    let config = &mut ctx.accounts.config;
 
     // TODO Owner is not needed, hardcode it as a Timelock during the initialization
     // Set the owner of the config (effectively the owner of the program).
@@ -298,6 +303,19 @@ pub mod lockbox_governor {
 pub struct InitializeLockboxGovernor<'info> {
   #[account(mut)]
   pub signer: Signer<'info>,
+
+    #[account(
+        init,
+        payer = owner,
+        seeds = [Config::SEED_PREFIX],
+        bump,
+        space = Config::MAXIMUM_SIZE,
+
+    )]
+    /// Config account, which saves program data useful for other instructions.
+    /// Also saves the payer of the [`initialize`](crate::initialize) instruction
+    /// as the program's owner.
+    pub config: Account<'info, Config>,
 
   #[account(init,
     seeds = [

@@ -4,7 +4,7 @@ use wormhole_anchor_sdk::wormhole;
 use crate::{
     error::HelloWorldError,
     message::HelloWorldMessage,
-    state::{Config, ForeignEmitter, Received, WormholeEmitter},
+    state::{Config, LockboxGovernor, Received},
 };
 
 #[derive(Accounts)]
