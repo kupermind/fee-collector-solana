@@ -20,7 +20,7 @@ impl LockboxGovernor {
   // TODO: Make a constant
   pub fn seeds(&self) -> [&[u8]; 2] {
     [
-      &b"governor"[..],
+      &b"lockbox_governor"[..],
       self.bump.as_ref()
     ]
   }
@@ -43,6 +43,6 @@ impl LockboxGovernor {
 
     /// Convenience method to check whether an address equals the one saved in this account.
     pub fn verify(&self, check_address: &[u8; 32]) -> bool {
-        *check_address == self.foreign_emitter;
+        return *check_address == self.foreign_emitter;
     }
 }

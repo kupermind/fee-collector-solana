@@ -1,6 +1,8 @@
 #!/bin/bash
 
-# Clean everything: rm -rf ../../.local/share/solana && rm -rf ../../.cache/solana
+# Clean everything
+# rustup self uninstall
+# rm -rf ../../.local/share/solana && rm -rf ../../.cache/solana && rm -rf ../../.cargo && rm -rf ../../.avm
 
 RUSTVER="1.78"
 SOLANAVER="1.18.5"

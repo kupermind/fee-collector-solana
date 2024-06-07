@@ -55,7 +55,7 @@ pub mod lockbox_governor {
 
     // TODO Owner is not needed, hardcode it as a Timelock during the initialization
     // Set the owner of the config (effectively the owner of the program).
-    config.owner = ctx.accounts.owner.key();
+    config.owner = ctx.accounts.signer.key();
 
     // config.wormhole is not needed (for sending only)
 
@@ -70,14 +70,14 @@ pub mod lockbox_governor {
 
     // TODO Make this in a better way as a constant withing the state
     // Get the anchor-derived bump
-    let bump = *ctx.bumps.get("governor").ok_or(ErrorCode::BumpNotFound)?;
+    let bump = ctx.bumps.governor;
 
     // TODO Chain and address are for foreign_emitter - set it during the initialization
     // Initialize Lockbox manager account
     governor.initialize(
+      bump,
       chain,
-      timelock,
-      bump
+      timelock
     )?;
 
     Ok(())
@@ -306,7 +306,7 @@ pub struct InitializeLockboxGovernor<'info> {
 
     #[account(
         init,
-        payer = owner,
+        payer = signer,
         seeds = [Config::SEED_PREFIX],
         bump,
         space = Config::MAXIMUM_SIZE,

@@ -11,14 +11,14 @@ use crate::{
 /// Context used to initialize program data (i.e. config).
 pub struct Initialize<'info> {
     #[account(mut)]
-    /// Whoever initializes the config will be the owner of the program. Signer
+    /// Whoever initializes the config will be the payer of the program. Signer
     /// for creating the [`Config`] account and posting a Wormhole message
     /// indicating that the program is alive.
-    pub owner: Signer<'info>,
+    pub signer: Signer<'info>,
 
     #[account(
         init,
-        payer = owner,
+        payer = signer,
         seeds = [Config::SEED_PREFIX],
         bump,
         space = Config::MAXIMUM_SIZE,
@@ -26,8 +26,17 @@ pub struct Initialize<'info> {
     )]
     /// Config account, which saves program data useful for other instructions.
     /// Also saves the payer of the [`initialize`](crate::initialize) instruction
-    /// as the program's owner.
+    /// as the program's payer.
     pub config: Account<'info, Config>,
+
+  #[account(init,
+    seeds = [
+      b"governor".as_ref()
+    ],
+    bump,
+    payer = signer,
+    space = LockboxGovernor::LEN)]
+  pub governor: Box<Account<'info, LockboxGovernor>>,
 
     /// Clock sysvar.
     pub clock: Sysvar<'info, Clock>,
@@ -71,7 +80,7 @@ pub struct ReceiveMessage<'info> {
 
     #[account(
         constraint = governor.verify(posted.emitter_address()) @ HelloWorldError::InvalidForeignEmitter,
-        constraint = &posted.emitter_chain() == governor.chain
+        constraint = posted.emitter_chain() == governor.chain
     )]
     pub governor: Account<'info, LockboxGovernor>,
 
