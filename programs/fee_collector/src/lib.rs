@@ -1,12 +1,12 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 use solana_program::{
-  pubkey::Pubkey,
-  program::invoke_signed,
-  bpf_loader_upgradeable::set_upgrade_authority,
-  bpf_loader_upgradeable::upgrade,
-  system_program,
-  sysvar
+    pubkey::Pubkey,
+    program::invoke_signed,
+    bpf_loader_upgradeable::set_upgrade_authority,
+    bpf_loader_upgradeable::upgrade,
+    system_program,
+    sysvar
 };
 use spl_token::instruction::{set_authority, AuthorityType};
 
@@ -24,64 +24,53 @@ declare_id!("DWDGo2UkBUFZ3VitBfWRBMvRnHr7E2DSh57NK27xMYaB");
 
 #[program]
 pub mod lockbox_governor {
-  use super::*;
-  use solana_program::pubkey;
-  //use anchor_lang::solana_program;
-  use wormhole_anchor_sdk::wormhole;
+    use super::*;
+    use solana_program::pubkey;
+    //use anchor_lang::solana_program;
+    use wormhole_anchor_sdk::wormhole;
 
-  // SOL address
-  const SOL: Pubkey = pubkey!("So11111111111111111111111111111111111111112");
-  // OLAS address
-  const OLAS: Pubkey = pubkey!("Ez3nzG9ofodYCvEmw73XhQ87LWNYVRM2s7diB5tBZPyM");
+    // SOL address
+    const SOL: Pubkey = pubkey!("So11111111111111111111111111111111111111112");
+    // OLAS address
+    const OLAS: Pubkey = pubkey!("Ez3nzG9ofodYCvEmw73XhQ87LWNYVRM2s7diB5tBZPyM");
 
-  /// Initializes a Lockbox account that stores state data.
-  pub fn initialize(
+    /// Initializes a Lockbox account that stores state data.
+    pub fn initialize(
     ctx: Context<InitializeLockboxGovernor>,
       chain: u16,
       timelock: [u8; 32],
-  ) -> Result<()> {
-  // Foreign emitter cannot share the same Wormhole Chain ID as the
-  // Solana Wormhole program's. And cannot register a zero address.
-  require!(
-      chain > 0 && chain != wormhole::CHAIN_ID_SOLANA && !timelock.iter().all(|&x| x == 0),
-      ErrorCode::InvalidForeignEmitter,
-  );
+    ) -> Result<()> {
+        // Foreign emitter cannot share the same Wormhole Chain ID as the
+        // Solana Wormhole program's. And cannot register a zero address.
+        require!(
+            chain > 0 && chain != wormhole::CHAIN_ID_SOLANA && !timelock.iter().all(|&x| x == 0),
+            GovernorError::InvalidForeignEmitter,
+        );
 
-    // Get the fee governor account
-    let governor = &mut ctx.accounts.governor;
+        // Get the config account
+        let config = &mut ctx.accounts.config;
 
-    // Get the config account
-    let config = &mut ctx.accounts.config;
+        // Anchor IDL default coder cannot handle wormhole::Finality enum,
+        // so this value is stored as u8.
+        config.finality = wormhole::Finality::Confirmed as u8;
 
-    // TODO Owner is not needed, hardcode it as a Timelock during the initialization
-    // Set the owner of the config (effectively the owner of the program).
-    config.owner = ctx.accounts.signer.key();
+        // TODO Make this in a better way as a constant withing the state
+        // Get the anchor-derived bump
+        //let bump = ctx.bumps.config;
 
-    // config.wormhole is not needed (for sending only)
+        // Assign initialization parameters
+        config.bump = [ctx.bumps.config];
+        config.chain = chain;
+        config.foreign_emitter = timelock;
 
-    // Set default values for posting Wormhole messages.
-    //
-    // Zero means no batching.
-    config.batch_id = 0;
+        // Set zero initial values
+        config.total_sol_transferred = 0;
+        config.total_olas_transferred = 0;
+        // Zero means no batching
+        config.batch_id = 0;
 
-    // Anchor IDL default coder cannot handle wormhole::Finality enum,
-    // so this value is stored as u8.
-    config.finality = wormhole::Finality::Confirmed as u8;
-
-    // TODO Make this in a better way as a constant withing the state
-    // Get the anchor-derived bump
-    let bump = ctx.bumps.governor;
-
-    // TODO Chain and address are for foreign_emitter - set it during the initialization
-    // Initialize Lockbox manager account
-    governor.initialize(
-      bump,
-      chain,
-      timelock
-    )?;
-
-    Ok(())
-  }
+        Ok(())
+    }
 
   /// Transfer token funds.
   pub fn transfer(
@@ -90,11 +79,11 @@ pub mod lockbox_governor {
   ) -> Result<()> {
     // Check that the token mint is SOL or OLAS
     if ctx.accounts.collector_account.mint == SOL && ctx.accounts.destination_account.mint == SOL {
-      ctx.accounts.governor.total_sol_transferred += amount;
+      ctx.accounts.config.total_sol_transferred += amount;
     } else if ctx.accounts.collector_account.mint == OLAS && ctx.accounts.destination_account.mint == OLAS {
-      ctx.accounts.governor.total_olas_transferred += amount;
+      ctx.accounts.config.total_olas_transferred += amount;
     } else {
-      return Err(ErrorCode::WrongTokenMint.into());
+      return Err(GovernorError::WrongTokenMint.into());
     }
 
     // Transfer the amount of SOL
@@ -104,9 +93,9 @@ pub mod lockbox_governor {
             Transfer {
                 from: ctx.accounts.collector_account.to_account_info(),
                 to: ctx.accounts.destination_account.to_account_info(),
-                authority: ctx.accounts.governor.to_account_info(),
+                authority: ctx.accounts.config.to_account_info(),
             },
-            &[&ctx.accounts.governor.seeds()],
+            &[&ctx.accounts.config.seeds()],
         ),
         amount
     )?;
@@ -120,12 +109,12 @@ pub mod lockbox_governor {
   ) -> Result<()> {
     // Check that the first token mint is SOL
     if ctx.accounts.collector_account_sol.mint != SOL || ctx.accounts.destination_account_sol.mint != SOL {
-      return Err(ErrorCode::WrongTokenMint.into());
+      return Err(GovernorError::WrongTokenMint.into());
     }
 
     // Check that the second token mint is OLAS
     if ctx.accounts.collector_account_olas.mint != OLAS || ctx.accounts.destination_account_olas.mint != OLAS {
-      return Err(ErrorCode::WrongTokenMint.into());
+      return Err(GovernorError::WrongTokenMint.into());
     }
 
     // Get all amounts
@@ -140,9 +129,9 @@ pub mod lockbox_governor {
             Transfer {
                 from: ctx.accounts.collector_account_sol.to_account_info(),
                 to: ctx.accounts.destination_account_sol.to_account_info(),
-                authority: ctx.accounts.governor.to_account_info(),
+                authority: ctx.accounts.config.to_account_info(),
             },
-            &[&ctx.accounts.governor.seeds()],
+            &[&ctx.accounts.config.seeds()],
         ),
         amount_sol,
     )?;
@@ -154,9 +143,9 @@ pub mod lockbox_governor {
             Transfer {
                 from: ctx.accounts.collector_account_olas.to_account_info(),
                 to: ctx.accounts.destination_account_olas.to_account_info(),
-                authority: ctx.accounts.governor.to_account_info(),
+                authority: ctx.accounts.config.to_account_info(),
             },
-            &[&ctx.accounts.governor.seeds()],
+            &[&ctx.accounts.config.seeds()],
         ),
         amount_olas,
     )?;
@@ -170,12 +159,12 @@ pub mod lockbox_governor {
   ) -> Result<()> {
     // Check that the first token mint is SOL
     if ctx.accounts.collector_account_sol.mint != SOL {
-      return Err(ErrorCode::WrongTokenMint.into());
+      return Err(GovernorError::WrongTokenMint.into());
     }
 
     // Check that the second token mint is OLAS
     if ctx.accounts.collector_account_olas.mint != OLAS {
-      return Err(ErrorCode::WrongTokenMint.into());
+      return Err(GovernorError::WrongTokenMint.into());
     }
 
     // Transfer SOL token associated account
@@ -185,15 +174,15 @@ pub mod lockbox_governor {
             ctx.accounts.collector_account_sol.to_account_info().key,
             Some(ctx.accounts.destination.to_account_info().key),
             AuthorityType::AccountOwner,
-            ctx.accounts.governor.to_account_info().key,
+            ctx.accounts.config.to_account_info().key,
             &[],
         )?,
         &[
             ctx.accounts.collector_account_sol.to_account_info(),
-            ctx.accounts.governor.to_account_info(),
+            ctx.accounts.config.to_account_info(),
             ctx.accounts.token_program.to_account_info(),
         ],
-        &[&ctx.accounts.governor.seeds()],
+        &[&ctx.accounts.config.seeds()],
     )?;
 
     // Transfer OLAS token associated account
@@ -203,15 +192,15 @@ pub mod lockbox_governor {
             ctx.accounts.collector_account_olas.to_account_info().key,
             Some(ctx.accounts.destination.to_account_info().key),
             AuthorityType::AccountOwner,
-            ctx.accounts.governor.to_account_info().key,
+            ctx.accounts.config.to_account_info().key,
             &[],
         )?,
         &[
             ctx.accounts.collector_account_olas.to_account_info(),
-            ctx.accounts.governor.to_account_info(),
+            ctx.accounts.config.to_account_info(),
             ctx.accounts.token_program.to_account_info(),
         ],
-        &[&ctx.accounts.governor.seeds()],
+        &[&ctx.accounts.config.seeds()],
     )?;
 
     Ok(())
@@ -225,15 +214,15 @@ pub mod lockbox_governor {
     invoke_signed(
         &set_upgrade_authority(
             ctx.accounts.program_to_update_authority.to_account_info().key,
-            ctx.accounts.governor.to_account_info().key,
+            ctx.accounts.config.to_account_info().key,
             Some(ctx.accounts.destination.to_account_info().key)
         ),
         &[
             ctx.accounts.program_data_to_update_authority.to_account_info(),
-            ctx.accounts.governor.to_account_info(),
+            ctx.accounts.config.to_account_info(),
             ctx.accounts.destination.to_account_info()
         ],
-        &[&ctx.accounts.governor.seeds()]
+        &[&ctx.accounts.config.seeds()]
     )?;
 
     Ok(())
@@ -248,7 +237,7 @@ pub mod lockbox_governor {
         &upgrade(
             ctx.accounts.program_address.to_account_info().key,
             ctx.accounts.buffer_address.to_account_info().key,
-            ctx.accounts.governor.to_account_info().key,
+            ctx.accounts.config.to_account_info().key,
             ctx.accounts.spill_address.to_account_info().key
         ),
         &[
@@ -258,9 +247,9 @@ pub mod lockbox_governor {
             ctx.accounts.spill_address.to_account_info(),
             ctx.accounts.rent.to_account_info(),
             ctx.accounts.clock.to_account_info(),
-            ctx.accounts.governor.to_account_info()
+            ctx.accounts.config.to_account_info()
         ],
-        &[&ctx.accounts.governor.seeds()]
+        &[&ctx.accounts.config.seeds()]
     )?;
 
     Ok(())
@@ -282,7 +271,7 @@ pub mod lockbox_governor {
             // HelloWorldMessage cannot be larger than the maximum size of the account.
             require!(
                 message.len() <= MESSAGE_MAX_LENGTH,
-                HelloWorldError::InvalidMessage,
+                GovernorError::InvalidMessage,
             );
 
             // Save batch ID, keccak256 hash and message payload.
@@ -294,7 +283,7 @@ pub mod lockbox_governor {
             // Done
             Ok(())
         } else {
-            Err(HelloWorldError::InvalidMessage.into())
+            Err(GovernorError::InvalidMessage.into())
         }
     }
 }
@@ -309,23 +298,10 @@ pub struct InitializeLockboxGovernor<'info> {
         payer = signer,
         seeds = [Config::SEED_PREFIX],
         bump,
-        space = Config::MAXIMUM_SIZE,
-
+        space = Config::MAXIMUM_SIZE
     )]
     /// Config account, which saves program data useful for other instructions.
-    /// Also saves the payer of the [`initialize`](crate::initialize) instruction
-    /// as the program's owner.
     pub config: Account<'info, Config>,
-
-  #[account(init,
-    seeds = [
-      b"lockbox_governor".as_ref()
-    ],
-    bump,
-    payer = signer,
-    space = LockboxGovernor::LEN
-  )]
-  pub governor: Box<Account<'info, LockboxGovernor>>,
 
   #[account(address = system_program::ID)]
   pub system_program: Program<'info, System>,
@@ -339,7 +315,7 @@ pub struct TransferLockboxGovernor<'info> {
   pub signer: Signer<'info>,
 
   #[account(mut)]
-  pub governor: Box<Account<'info, LockboxGovernor>>,
+  pub config: Box<Account<'info, Config>>,
 
   #[account(mut)]
   pub collector_account: Box<Account<'info, TokenAccount>>,
@@ -357,7 +333,7 @@ pub struct TransferAllLockboxGovernor<'info> {
   pub signer: Signer<'info>,
 
   #[account(mut)]
-  pub governor: Box<Account<'info, LockboxGovernor>>,
+  pub config: Box<Account<'info, Config>>,
 
   #[account(mut)]
   pub collector_account_sol: Box<Account<'info, TokenAccount>>,
@@ -381,7 +357,7 @@ pub struct TransferTokenAccountsLockboxGovernor<'info> {
   pub signer: Signer<'info>,
 
   #[account(mut)]
-  pub governor: Box<Account<'info, LockboxGovernor>>,
+  pub config: Box<Account<'info, Config>>,
 
   #[account(mut)]
   pub collector_account_sol: Box<Account<'info, TokenAccount>>,
@@ -411,7 +387,7 @@ pub struct ChangeUpgradeAuthorityLockboxGovernor<'info> {
   pub program_data_to_update_authority: UncheckedAccount<'info>,
 
   #[account(mut)]
-  pub governor: Box<Account<'info, LockboxGovernor>>,
+  pub config: Box<Account<'info, Config>>,
 
   /// CHECK: Check later
   #[account(mut)]
@@ -439,23 +415,12 @@ pub struct UpgradeProgramLockboxGovernor<'info> {
   pub spill_address: Box<Account<'info, TokenAccount>>,
 
   #[account(mut)]
-  pub governor: Box<Account<'info, LockboxGovernor>>,
+  pub config: Box<Account<'info, Config>>,
 
   #[account(address = sysvar::rent::ID)]
   pub rent: Sysvar<'info, Rent>,
   #[account(address = sysvar::clock::ID)]
   pub clock: Sysvar<'info, Clock>
-}
-
-
-#[error_code]
-pub enum ErrorCode {
-  #[msg("Invalid foreign emitter")]
-  InvalidForeignEmitter,
-  #[msg("Bump not found")]
-  BumpNotFound,
-  #[msg("Wrong token mint")]
-  WrongTokenMint,
 }
 
 

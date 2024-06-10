@@ -2,9 +2,9 @@ use anchor_lang::prelude::*;
 use wormhole_anchor_sdk::wormhole;
 
 use crate::{
-    error::HelloWorldError,
+    error::GovernorError,
     message::HelloWorldMessage,
-    state::{Config, LockboxGovernor, Received},
+    state::{Config, Received},
 };
 
 #[derive(Accounts)]
@@ -29,15 +29,6 @@ pub struct Initialize<'info> {
     /// as the program's payer.
     pub config: Account<'info, Config>,
 
-  #[account(init,
-    seeds = [
-      b"governor".as_ref()
-    ],
-    bump,
-    payer = signer,
-    space = LockboxGovernor::LEN)]
-  pub governor: Box<Account<'info, LockboxGovernor>>,
-
     /// Clock sysvar.
     pub clock: Sysvar<'info, Clock>,
 
@@ -58,6 +49,8 @@ pub struct ReceiveMessage<'info> {
     #[account(
         seeds = [Config::SEED_PREFIX],
         bump,
+        constraint = config.verify(posted.emitter_address()) @ GovernorError::InvalidForeignEmitter,
+        constraint = posted.emitter_chain() == config.chain
     )]
     /// Config account. Wormhole PDAs specified in the config are checked
     /// against the Wormhole accounts in this context. Read-only.
@@ -77,12 +70,6 @@ pub struct ReceiveMessage<'info> {
     /// Verified Wormhole message account. The Wormhole program verified
     /// signatures and posted the account data here. Read-only.
     pub posted: Account<'info, wormhole::PostedVaa<HelloWorldMessage>>,
-
-    #[account(
-        constraint = governor.verify(posted.emitter_address()) @ HelloWorldError::InvalidForeignEmitter,
-        constraint = posted.emitter_chain() == governor.chain
-    )]
-    pub governor: Account<'info, LockboxGovernor>,
 
     #[account(
         init,

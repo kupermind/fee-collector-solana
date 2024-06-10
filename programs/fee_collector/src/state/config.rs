@@ -23,8 +23,6 @@ impl WormholeAddresses {
 #[derive(Default)]
 /// Config account data.
 pub struct Config {
-    /// Program's owner.
-    pub owner: Pubkey,
     /// Wormhole program's relevant addresses.
     pub wormhole: WormholeAddresses,
     /// AKA nonce. Just zero, but saving this information in this account
@@ -33,18 +31,45 @@ pub struct Config {
     /// AKA consistency level. u8 representation of Solana's
     /// [Finality](wormhole_anchor_sdk::wormhole::Finality).
     pub finality: u8,
+    // Config bump
+    pub bump: [u8; 1],
+    // Foreign chain Id
+    pub chain: u16,
+    // Foreign emitter address in bytes array
+    pub foreign_emitter: [u8; 32],
+    // Total SOL amount transferred
+    pub total_sol_transferred: u64,
+    // Total OLAS amount transferred
+    pub total_olas_transferred: u64
 }
 
 impl Config {
     pub const MAXIMUM_SIZE: usize = 8 // discriminator
-        + 32 // owner
         + WormholeAddresses::LEN
-        + 4 // batch_id
-        + 1 // finality
+        + 4  // batch_id
+        + 1  // finality
+        + 1  // bump
+        + 2  // chain Id
+        + 32 // foreign emitter
+        + 8  // SOL amount transferred
+        + 8  // OALS amount transferred
         
     ;
     /// AKA `b"config"`.
     pub const SEED_PREFIX: &'static [u8; 6] = b"config";
+
+    pub fn seeds(&self) -> [&[u8]; 2] {
+        [
+            //&b"config"[..],
+            Self::SEED_PREFIX,
+            self.bump.as_ref()
+        ]
+    }
+
+    /// Convenience method to check whether an address equals the one saved in this account.
+    pub fn verify(&self, check_address: &[u8; 32]) -> bool {
+        return *check_address == self.foreign_emitter;
+    }
 }
 
 #[cfg(test)]
@@ -58,10 +83,14 @@ pub mod test {
         assert_eq!(
             Config::MAXIMUM_SIZE, 
             size_of::<u64>()
-            + size_of::<Pubkey>() 
             + size_of::<WormholeAddresses>()
             + size_of::<u32>()
             + size_of::<u8>()
+            + size_of::<u8>()
+            + size_of::<u16>()
+            + size_of::<Pubkey>()
+            + size_of::<u64>()
+            + size_of::<u64>()
         );
 
         Ok(())

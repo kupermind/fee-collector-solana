@@ -2,7 +2,7 @@ use anchor_lang::prelude::error_code;
 
 #[error_code]
 /// Errors relevant to this program's malfunction.
-pub enum HelloWorldError {
+pub enum GovernorError {
     #[msg("InvalidWormholeConfig")]
     /// Specified Wormhole bridge data PDA is wrong.
     InvalidWormholeConfig,
@@ -23,10 +23,6 @@ pub enum HelloWorldError {
     /// Specified sysvar is wrong.
     InvalidSysvar,
 
-    #[msg("OwnerOnly")]
-    /// Only the program's owner is permitted.
-    OwnerOnly,
-
     #[msg("InvalidForeignEmitter")]
     /// Specified foreign emitter has a bad chain ID or zero address.
     InvalidForeignEmitter,
@@ -38,4 +34,8 @@ pub enum HelloWorldError {
     #[msg("InvalidMessage")]
     /// Deserialized message has unexpected payload type.
     InvalidMessage,
+
+    #[msg("Wrong token mint")]
+    /// Wrong token mint specified.
+    WrongTokenMint
 }

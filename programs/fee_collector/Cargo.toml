@@ -22,8 +22,8 @@ cpi = ["no-entrypoint"]
 overflow-checks = true
 
 [dependencies]
-solana-program = "=1.18.1"
-anchor-lang = { version = "0.29.0", features = ["init-if-needed"]}
-anchor-spl = "0.29.0"
-wormhole-anchor-sdk = { version = "0.29.0-alpha.1", default-features = false }
-spl-token = { version = "4.0.1", features = ["no-entrypoint"] }
+solana-program = "=1.16.6"
+anchor-lang = { version = "0.26.0", features = ["init-if-needed"]}
+anchor-spl = "0.26.0"
+wormhole-anchor-sdk = { version = "0.1.0-alpha.2", default-features = false }
+spl-token = { version = "3.3", features = ["no-entrypoint"] }
