@@ -3,7 +3,7 @@ use wormhole_anchor_sdk::wormhole;
 
 use crate::{
     error::GovernorError,
-    message::HelloWorldMessage,
+    message::GovernorMessage,
     state::{Config, Received},
 };
 
@@ -69,7 +69,7 @@ pub struct ReceiveMessage<'info> {
     )]
     /// Verified Wormhole message account. The Wormhole program verified
     /// signatures and posted the account data here. Read-only.
-    pub posted: Account<'info, wormhole::PostedVaa<HelloWorldMessage>>,
+    pub posted: Account<'info, wormhole::PostedVaa<GovernorMessage>>,
 
     #[account(
         init,

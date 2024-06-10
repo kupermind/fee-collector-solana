@@ -267,24 +267,21 @@ pub mod lockbox_governor {
     pub fn receive_message(ctx: Context<ReceiveMessage>, vaa_hash: [u8; 32]) -> Result<()> {
         let posted_message = &ctx.accounts.posted;
 
-        if let HelloWorldMessage::Hello { message } = posted_message.data() {
-            // HelloWorldMessage cannot be larger than the maximum size of the account.
-            require!(
-                message.len() <= MESSAGE_MAX_LENGTH,
-                GovernorError::InvalidMessage,
-            );
+        let GovernorMessage { message } = posted_message.data();
+        // GovernorMessage cannot be larger than the maximum size of the account.
+        require!(
+            message.len() <= MESSAGE_MAX_LENGTH,
+            GovernorError::InvalidMessage,
+        );
 
-            // Save batch ID, keccak256 hash and message payload.
-            let received = &mut ctx.accounts.received;
-            received.batch_id = posted_message.batch_id();
-            received.wormhole_message_hash = vaa_hash;
-            received.message = message.clone();
+        // Save batch ID, keccak256 hash and message payload.
+        let received = &mut ctx.accounts.received;
+        received.batch_id = posted_message.batch_id();
+        received.wormhole_message_hash = vaa_hash;
+        received.message = message.clone();
 
-            // Done
-            Ok(())
-        } else {
-            Err(GovernorError::InvalidMessage.into())
-        }
+        // Done
+        Ok(())
     }
 }
 

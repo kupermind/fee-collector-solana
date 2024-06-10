@@ -19,5 +19,5 @@ curl -sSfL https://release.solana.com/v${SOLANAVER}/install | sh
 
 cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
 avm install $ANCHORVER
-avm use $ANCHORVER
+avm use $AN CHORVER
 
