@@ -1,4 +1,4 @@
-use anchor_lang::{prelude::Pubkey, AnchorDeserialize, AnchorSerialize};
+use anchor_lang::{AnchorDeserialize, AnchorSerialize};
 use std::io;
 use wormhole_io::{Readable, Writeable};
 
@@ -25,25 +25,38 @@ pub const HELLO_MESSAGE_MAX_LENGTH: usize = 512;
 // }
 
 #[derive(Clone)]
-pub struct GovernorMessage {
-    pub message: Vec<u8>,
+pub struct TransferMessage {
+    pub token: [u8; 32],
+    pub destination: [u8; 32],
+    pub amount: u64
 }
 
-impl AnchorSerialize for GovernorMessage {
+impl AnchorSerialize for TransferMessage {
     fn serialize<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
-        for item in &self.message {
-            item.write(writer)?;
-        }
+        PAYLOAD_TRANSFER.write(writer)?;
+        self.token.write(writer)?;
+        self.destination.write(writer)?;
+        self.amount.write(writer)?;
+
         Ok(())
     }
 }
 
-impl AnchorDeserialize for GovernorMessage {
+impl AnchorDeserialize for TransferMessage {
     fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
-        let message = <[u8; 11]>::read(reader)?;
-        Ok(GovernorMessage {
-            message: message.to_vec(),
-        })
+        let selector = u8::read(reader)?;
+
+        match selector {
+            PAYLOAD_TRANSFER => Ok(TransferMessage {
+                token: <[u8; 32]>::read(reader)?,
+                destination: <[u8; 32]>::read(reader)?,
+                amount: u64::read(reader)?,
+            }),
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Invalid payload ID",
+            )),
+        }
     }
 }
 

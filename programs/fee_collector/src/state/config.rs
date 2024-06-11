@@ -41,7 +41,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub const MAXIMUM_SIZE: usize = 8 // discriminator
+    pub const LEN: usize = 8 // discriminator
         + WormholeAddresses::LEN
         + 1  // finality
         + 1  // bump

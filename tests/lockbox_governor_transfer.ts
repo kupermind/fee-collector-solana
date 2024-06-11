@@ -7,12 +7,14 @@ import {
 } from "@solana/spl-token";
 import expect from "expect";
 import fs from "fs";
+import bs58 from "bs58";
 
 // UNIX/Linux/Mac
 // bash$ export ANCHOR_PROVIDER_URL=http://127.0.0.1:8899
 // bash$ export ANCHOR_WALLET=artifacts/id.json
 
 async function main() {
+
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
@@ -21,11 +23,11 @@ async function main() {
   const program = new Program(idl as anchor.Idl, PROGRAM_ID, anchor.getProvider());
 
   const chainId = 10002;
-  const sequence = 1;
+  const sequence = 5;
   const sol = new anchor.web3.PublicKey("So11111111111111111111111111111111111111112");
   const olas = new anchor.web3.PublicKey("Ez3nzG9ofodYCvEmw73XhQ87LWNYVRM2s7diB5tBZPyM");
   const wormhole = new anchor.web3.PublicKey("3u8hJUVTA4jH1wYAyUur7FFZVQ8H635K3tSHHF4ssjQ5");
-  const posted = new anchor.web3.PublicKey("4XRXuLFfa2pT56JNtjCsGLpG9yriYt8pr3D2GseYpfkP");
+  const posted = new anchor.web3.PublicKey("GbY67sCAMj2CZAUzFiepZgf3Npqa7VtkCi7bbKRx8Pap");
 
   // This corresponds to Sepolia timelock address 000000000000000000000000471b3f60f08c50dd0ecba1bcd113b66fcc02b63d or 0x471b3f60f08c50dd0ecba1bcd113b66fcc02b63d
   const timelockBuffer = Buffer.from([
@@ -36,17 +38,15 @@ async function main() {
   ]);
   const timelock = new anchor.web3.PublicKey(timelockBuffer);
 
-  const vaaHash = Buffer.from([
-    238, 250, 138, 215,  81, 181, 253,
-    141, 100, 108, 178, 123, 104, 115,
-    183,  68, 161, 114, 198,  22, 168,
-    149, 101, 175,   9, 190, 140, 180,
-    220,  73, 133, 109
+  const vaaHashTransfer = Buffer.from([
+     40,  36, 107,  71, 126, 222,  84, 234,
+    225,  87, 239, 143, 179, 232, 152,   9,
+    142,  51,  51,  95, 138,  99, 190, 216,
+    170, 207,  20, 189, 193, 230, 116, 238
   ]);
 
   // User wallet is the provider payer
   const userWallet = provider.wallet["payer"];
-  console.log("User wallet:", userWallet.publicKey.toBase58());
 
   console.log("timelock", timelock.toBase58());
 
@@ -68,12 +68,27 @@ async function main() {
         userWallet.publicKey
     );
     console.log("User ATA for tokenA:", tokenOwnerAccountA.address.toBase58());
+    //console.log("SOL ATA in hex", bs58.decode(tokenOwnerAccountA.address.toBase58()).toString("hex"));
 
     // Simulate SOL transfer and the sync of native SOL
     await provider.connection.requestAirdrop(tokenOwnerAccountA.address, 100000000000);
     await syncNative(provider.connection, userWallet, tokenOwnerAccountA.address);
 
-    // Get the tokenA ATA of the userWallet address, and if it does not exist, create it
+    // Get the tokenA PDA ATA of the program Id, and if it does not exist, create it
+    const pdaTokenAccountA = await getOrCreateAssociatedTokenAccount(
+        provider.connection,
+        userWallet,
+        sol,
+        pdaConfig,
+        true
+    );
+    console.log("Program PDA ATA for tokenA:", pdaTokenAccountA.address.toBase58());
+
+    // Simulate SOL transfer and the sync of native SOL
+    await provider.connection.requestAirdrop(pdaTokenAccountA.address, 100000000000);
+    await syncNative(provider.connection, userWallet, pdaTokenAccountA.address);
+
+    // Get the tokenB ATA of the userWallet address, and if it does not exist, create it
     const tokenOwnerAccountB = await getOrCreateAssociatedTokenAccount(
         provider.connection,
         userWallet,
@@ -81,6 +96,16 @@ async function main() {
         userWallet.publicKey
     );
     console.log("User ATA for tokenB:", tokenOwnerAccountB.address.toBase58());
+
+    // Get the tokenB PDA ATA of the userWallet address, and if it does not exist, create it
+    const pdaTokenAccountB = await getOrCreateAssociatedTokenAccount(
+        provider.connection,
+        userWallet,
+        olas,
+        pdaConfig,
+        true
+    );
+    console.log("Program PDA ATA for tokenB:", pdaTokenAccountB.address.toBase58());
 
   let signature = null;
 
@@ -129,13 +154,15 @@ async function main() {
     // Receive message
     try {
         signature = await program.methods
-          .receiveMessage(vaaHash)
+          .transfer(vaaHashTransfer)
           .accounts(
             {
               config: pdaConfig,
               wormholeProgram: wormhole,
               posted,
-              received: pdaReceived
+              received: pdaReceived,
+              sourceAccount: pdaTokenAccountA.address,
+              destinationAccount: tokenOwnerAccountA.address
             }
           )
           .rpc();
@@ -154,7 +181,7 @@ async function main() {
         ...(await provider.connection.getLatestBlockhash()),
     });
 
-    console.log("Successfully received the message");
+    console.log("Successfully transferred the funds");
 }
 
 main();

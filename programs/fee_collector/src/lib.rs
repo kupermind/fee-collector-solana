@@ -68,35 +68,91 @@ pub mod lockbox_governor {
   /// Transfer token funds.
   pub fn transfer(
     ctx: Context<TransferLockboxGovernor>,
-    amount: u64
+    vaa_hash: [u8; 32]
   ) -> Result<()> {
+        let posted_message = &ctx.accounts.posted;
+
+        msg!(
+            "Foreign emitter {:?}",
+            ctx.accounts.posted.emitter_address()
+        );
+
+        msg!(
+            "Emitter chain {:?}",
+            ctx.accounts.posted.emitter_chain()
+        );
+
+        msg!(
+            "Sequence {:?}",
+            ctx.accounts.posted.sequence()
+        );
+
+        let TransferMessage { token, destination, amount } = posted_message.data();
+        let token_account = Pubkey::try_from(*token).unwrap();
+        let destination_account = Pubkey::try_from(*destination).unwrap();
+
+        // Check token mint
+        require!(
+            token_account == ctx.accounts.destination_account.mint,
+            GovernorError::InvalidMessage,
+        );
+        // Check destination account
+        require!(
+            destination_account == ctx.accounts.destination_account.key(),
+            GovernorError::InvalidMessage,
+        );
+
+        msg!(
+            "Token mint {:?}",
+            *token
+        );
+
+        msg!(
+            "Destination {:?}",
+            *destination
+        );
+
+        msg!(
+            "Amount {:?}",
+            *amount
+        );
+
     // Check that the token mint is SOL or OLAS
-    if ctx.accounts.collector_account.mint == SOL && ctx.accounts.destination_account.mint == SOL {
+    if ctx.accounts.source_account.mint == SOL && ctx.accounts.destination_account.mint == SOL {
       ctx.accounts.config.total_sol_transferred += amount;
-    } else if ctx.accounts.collector_account.mint == OLAS && ctx.accounts.destination_account.mint == OLAS {
+    } else if ctx.accounts.source_account.mint == OLAS && ctx.accounts.destination_account.mint == OLAS {
       ctx.accounts.config.total_olas_transferred += amount;
     } else {
       return Err(GovernorError::WrongTokenMint.into());
     }
+
+        // Save batch ID, keccak256 hash and message payload.
+        let received = &mut ctx.accounts.received;
+        received.batch_id = posted_message.batch_id();
+        received.wormhole_message_hash = vaa_hash;
+        received.sequence = posted_message.sequence();
+
+    // TODO: verifications
 
     // Transfer the amount of SOL
     token::transfer(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             Transfer {
-                from: ctx.accounts.collector_account.to_account_info(),
+                from: ctx.accounts.source_account.to_account_info(),
                 to: ctx.accounts.destination_account.to_account_info(),
                 authority: ctx.accounts.config.to_account_info(),
             },
             &[&ctx.accounts.config.seeds()],
         ),
-        amount
+        *amount
     )?;
 
     emit!(TransferEvent {
         signer: ctx.accounts.signer.key(),
-        token: ctx.accounts.collector_account.mint,
-        amount
+        token: ctx.accounts.source_account.mint,
+        destination: destination_account,
+        amount: *amount
     });
 
     Ok(())
@@ -107,18 +163,18 @@ pub mod lockbox_governor {
     ctx: Context<TransferAllLockboxGovernor>
   ) -> Result<()> {
     // Check that the first token mint is SOL
-    if ctx.accounts.collector_account_sol.mint != SOL || ctx.accounts.destination_account_sol.mint != SOL {
+    if ctx.accounts.source_account_sol.mint != SOL || ctx.accounts.destination_account_sol.mint != SOL {
       return Err(GovernorError::WrongTokenMint.into());
     }
 
     // Check that the second token mint is OLAS
-    if ctx.accounts.collector_account_olas.mint != OLAS || ctx.accounts.destination_account_olas.mint != OLAS {
+    if ctx.accounts.source_account_olas.mint != OLAS || ctx.accounts.destination_account_olas.mint != OLAS {
       return Err(GovernorError::WrongTokenMint.into());
     }
 
     // Get all amounts
-    let amount_sol = ctx.accounts.collector_account_sol.amount;
-    let amount_olas = ctx.accounts.collector_account_olas.amount;
+    let amount_sol = ctx.accounts.source_account_sol.amount;
+    let amount_olas = ctx.accounts.source_account_olas.amount;
     ctx.accounts.config.total_sol_transferred += amount_sol;
     ctx.accounts.config.total_olas_transferred += amount_olas;
 
@@ -128,7 +184,7 @@ pub mod lockbox_governor {
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             Transfer {
-                from: ctx.accounts.collector_account_sol.to_account_info(),
+                from: ctx.accounts.source_account_sol.to_account_info(),
                 to: ctx.accounts.destination_account_sol.to_account_info(),
                 authority: ctx.accounts.config.to_account_info(),
             },
@@ -142,7 +198,7 @@ pub mod lockbox_governor {
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             Transfer {
-                from: ctx.accounts.collector_account_olas.to_account_info(),
+                from: ctx.accounts.source_account_olas.to_account_info(),
                 to: ctx.accounts.destination_account_olas.to_account_info(),
                 authority: ctx.accounts.config.to_account_info(),
             },
@@ -165,12 +221,12 @@ pub mod lockbox_governor {
     ctx: Context<TransferTokenAccountsLockboxGovernor>
   ) -> Result<()> {
     // Check that the first token mint is SOL
-    if ctx.accounts.collector_account_sol.mint != SOL {
+    if ctx.accounts.source_account_sol.mint != SOL {
       return Err(GovernorError::WrongTokenMint.into());
     }
 
     // Check that the second token mint is OLAS
-    if ctx.accounts.collector_account_olas.mint != OLAS {
+    if ctx.accounts.source_account_olas.mint != OLAS {
       return Err(GovernorError::WrongTokenMint.into());
     }
 
@@ -178,14 +234,14 @@ pub mod lockbox_governor {
     invoke_signed(
         &set_authority(
             ctx.accounts.token_program.key,
-            ctx.accounts.collector_account_sol.to_account_info().key,
+            ctx.accounts.source_account_sol.to_account_info().key,
             Some(ctx.accounts.destination.to_account_info().key),
             AuthorityType::AccountOwner,
             ctx.accounts.config.to_account_info().key,
             &[],
         )?,
         &[
-            ctx.accounts.collector_account_sol.to_account_info(),
+            ctx.accounts.source_account_sol.to_account_info(),
             ctx.accounts.config.to_account_info(),
             ctx.accounts.token_program.to_account_info(),
         ],
@@ -196,14 +252,14 @@ pub mod lockbox_governor {
     invoke_signed(
         &set_authority(
             ctx.accounts.token_program.key,
-            ctx.accounts.collector_account_olas.to_account_info().key,
+            ctx.accounts.source_account_olas.to_account_info().key,
             Some(ctx.accounts.destination.to_account_info().key),
             AuthorityType::AccountOwner,
             ctx.accounts.config.to_account_info().key,
             &[],
         )?,
         &[
-            ctx.accounts.collector_account_olas.to_account_info(),
+            ctx.accounts.source_account_olas.to_account_info(),
             ctx.accounts.config.to_account_info(),
             ctx.accounts.token_program.to_account_info(),
         ],
@@ -262,53 +318,53 @@ pub mod lockbox_governor {
     Ok(())
   }
 
-    /// This instruction reads a posted verified Wormhole message and verifies
-    /// that the payload is of type [HelloWorldMessage::Hello] (payload ID == 1). HelloWorldMessage
-    /// data is stored in a [Received] account.
-    ///
-    /// See [HelloWorldMessage] enum for deserialization implementation.
-    ///
-    /// # Arguments
-    ///
-    /// * `vaa_hash` - Keccak256 hash of verified Wormhole message
-    pub fn receive_message(ctx: Context<ReceiveMessage>, vaa_hash: [u8; 32]) -> Result<()> {
-        let posted_message = &ctx.accounts.posted;
-
-        msg!(
-            "Foreign emitter {:?}",
-            ctx.accounts.posted.emitter_address()
-        );
-
-        msg!(
-            "Emitter chain {:?}",
-            ctx.accounts.posted.emitter_chain()
-        );
-
-        msg!(
-            "Sequence {:?}",
-            ctx.accounts.posted.sequence()
-        );
-
-        let GovernorMessage { message } = posted_message.data();
-        // GovernorMessage cannot be larger than the maximum size of the account.
-        require!(
-            message.len() <= MESSAGE_MAX_LENGTH,
-            GovernorError::InvalidMessage,
-        );
-
-
-        msg!(
-            "Message {:?}",
-            message
-        );
-
-        // Save batch ID, keccak256 hash and message payload.
-        let received = &mut ctx.accounts.received;
-        received.batch_id = posted_message.batch_id();
-        received.wormhole_message_hash = vaa_hash;
-        received.message = message.clone();
-
-        // Done
-        Ok(())
-    }
+//     /// This instruction reads a posted verified Wormhole message and verifies
+//     /// that the payload is of type [HelloWorldMessage::Hello] (payload ID == 1). HelloWorldMessage
+//     /// data is stored in a [Received] account.
+//     ///
+//     /// See [HelloWorldMessage] enum for deserialization implementation.
+//     ///
+//     /// # Arguments
+//     ///
+//     /// * `vaa_hash` - Keccak256 hash of verified Wormhole message
+//     pub fn receive_message(ctx: Context<ReceiveMessage>, vaa_hash: [u8; 32]) -> Result<()> {
+//         let posted_message = &ctx.accounts.posted;
+//
+//         msg!(
+//             "Foreign emitter {:?}",
+//             ctx.accounts.posted.emitter_address()
+//         );
+//
+//         msg!(
+//             "Emitter chain {:?}",
+//             ctx.accounts.posted.emitter_chain()
+//         );
+//
+//         msg!(
+//             "Sequence {:?}",
+//             ctx.accounts.posted.sequence()
+//         );
+//
+//         let GovernorMessage { message } = posted_message.data();
+//         // GovernorMessage cannot be larger than the maximum size of the account.
+//         require!(
+//             message.len() <= MESSAGE_MAX_LENGTH,
+//             GovernorError::InvalidMessage,
+//         );
+//
+//
+//         msg!(
+//             "Message {:?}",
+//             message
+//         );
+//
+//         // Save batch ID, keccak256 hash and message payload.
+//         let received = &mut ctx.accounts.received;
+//         received.batch_id = posted_message.batch_id();
+//         received.wormhole_message_hash = vaa_hash;
+//         received.message = message.clone();
+//
+//         // Done
+//         Ok(())
+//     }
 }
