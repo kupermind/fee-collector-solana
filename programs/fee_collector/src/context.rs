@@ -71,22 +71,22 @@ pub struct ReceiveMessage<'info> {
     /// signatures and posted the account data here. Read-only.
     pub posted: Account<'info, wormhole::PostedVaa<GovernorMessage>>,
 
-//     #[account(
-//         init,
-//         payer = payer,
-//         seeds = [
-//             Received::SEED_PREFIX,
-//             &posted.emitter_chain().to_le_bytes()[..],
-//             &posted.sequence().to_le_bytes()[..]
-//         ],
-//         bump,
-//         space = Received::MAXIMUM_SIZE
-//     )]
-//     /// Received account. [`receive_message`](crate::receive_message) will
-//     /// deserialize the Wormhole message's payload and save it to this account.
-//     /// This account cannot be overwritten, and will prevent Wormhole message
-//     /// replay with the same sequence.
-//     pub received: Account<'info, Received>,
+    #[account(
+        init,
+        payer = payer,
+        seeds = [
+            Received::SEED_PREFIX,
+            &posted.emitter_chain().to_le_bytes()[..],
+            &posted.sequence().to_le_bytes()[..]
+        ],
+        bump,
+        space = Received::MAXIMUM_SIZE
+    )]
+    /// Received account. [`receive_message`](crate::receive_message) will
+    /// deserialize the Wormhole message's payload and save it to this account.
+    /// This account cannot be overwritten, and will prevent Wormhole message
+    /// replay with the same sequence.
+    pub received: Account<'info, Received>,
 
     /// System program.
     pub system_program: Program<'info, System>,

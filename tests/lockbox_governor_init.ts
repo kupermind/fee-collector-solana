@@ -20,8 +20,8 @@ async function main() {
   const PROGRAM_ID = new anchor.web3.PublicKey("DWDGo2UkBUFZ3VitBfWRBMvRnHr7E2DSh57NK27xMYaB");
   const program = new Program(idl as anchor.Idl, PROGRAM_ID, anchor.getProvider());
 
-  const chainId = "10002";
-  const sequence = "1";
+  const chainId = 10002;
+  const sequence = 1;
   const sol = new anchor.web3.PublicKey("So11111111111111111111111111111111111111112");
   const olas = new anchor.web3.PublicKey("Ez3nzG9ofodYCvEmw73XhQ87LWNYVRM2s7diB5tBZPyM");
   const wormhole = new anchor.web3.PublicKey("3u8hJUVTA4jH1wYAyUur7FFZVQ8H635K3tSHHF4ssjQ5");
@@ -51,7 +51,8 @@ async function main() {
   console.log("timelock", timelock.toBase58());
 
     // Find a PDA account for the lockbox governor program
-    const [pdaConfig, bumpConfig] = await anchor.web3.PublicKey.findProgramAddress([Buffer.from("config", "utf-8")], program.programId);
+    const [pdaConfig, bumpConfig] = await anchor.web3.PublicKey.findProgramAddress([Buffer.from("config", "utf-8")],
+        program.programId);
     //let bumpBytes = Buffer.from(new Uint8Array([bumpConfig]));
     console.log("Lockbox Governor PDA address:", pdaConfig.toBase58());
     console.log("Lockbox Governor PDA bump:", bumpConfig);
@@ -114,8 +115,15 @@ async function main() {
     //console.log(accountInfo);
 
     // Find a PDA account for the lockbox governor program
+    let chainIdBuffer = Buffer.alloc(2);
+    chainIdBuffer.writeUInt16LE(chainId, 0);
+    let sequenceBuffer = Buffer.alloc(8);
+    sequenceBuffer.writeUInt16LE(sequence, 0);
+
+    console.log(chainIdBuffer);
+    console.log(sequenceBuffer);
     const [pdaReceived, bumpReceived] = await anchor.web3.PublicKey.findProgramAddress([Buffer.from("received"),
-        Buffer.from(chainId), Buffer.from(sequence)], wormhole);
+        chainIdBuffer, sequenceBuffer], program.programId);
     //let bumpBytes = Buffer.from(new Uint8Array([bumpConfig]));
     console.log("Received PDA address:", pdaReceived.toBase58());
     console.log("Received PDA bump:", bumpReceived);

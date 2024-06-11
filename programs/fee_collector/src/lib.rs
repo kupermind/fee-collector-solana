@@ -295,11 +295,11 @@ pub mod lockbox_governor {
             message
         );
 
-//         // Save batch ID, keccak256 hash and message payload.
-//         let received = &mut ctx.accounts.received;
-//         received.batch_id = posted_message.batch_id();
-//         received.wormhole_message_hash = vaa_hash;
-//         received.message = message.clone();
+        // Save batch ID, keccak256 hash and message payload.
+        let received = &mut ctx.accounts.received;
+        received.batch_id = posted_message.batch_id();
+        received.wormhole_message_hash = vaa_hash;
+        received.message = message.clone();
 
         // Done
         Ok(())
