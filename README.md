@@ -44,15 +44,14 @@ export ANCHOR_PROVIDER_URL=http://127.0.0.1:8899
 export ANCHOR_WALLET=artifacts/id.json
 ```
 
-To run the initial script that would just initialize the lockbox program along with having Orca Whirlpool program
-and required user accounts setup, run:
+To run the initial script that would just initialize the lockbox governor program run:
 ```
 solana airdrop 10000 9fit3w7t6FHATDaZWotpWqN7NpqgL3Lm1hqUop4hAy8h --url localhost && npx ts-node tests/lockbox_governor_init.ts
 ```
 
 To run integration test, make sure to stop and start the `validator.sh` in a separate window. Then run:
 ```
-solana airdrop 10000 9fit3w7t6FHATDaZWotpWqN7NpqgL3Lm1hqUop4hAy8h --url localhost && npx ts-node tests/fee_collector.ts
+solana airdrop 10000 9fit3w7t6FHATDaZWotpWqN7NpqgL3Lm1hqUop4hAy8h --url localhost && npx ts-node tests/lockbox_governor_transfer.ts
 ```
 
 The deployed program ID must be `DWDGo2UkBUFZ3VitBfWRBMvRnHr7E2DSh57NK27xMYaB` and corresponds to the `declare_id`
