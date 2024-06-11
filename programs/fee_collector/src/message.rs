@@ -27,6 +27,7 @@ pub const HELLO_MESSAGE_MAX_LENGTH: usize = 512;
 #[derive(Clone)]
 pub struct TransferMessage {
     pub token: [u8; 32],
+    pub source: [u8; 32],
     pub destination: [u8; 32],
     pub amount: u64
 }
@@ -35,6 +36,7 @@ impl AnchorSerialize for TransferMessage {
     fn serialize<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
         PAYLOAD_TRANSFER.write(writer)?;
         self.token.write(writer)?;
+        self.source.write(writer)?;
         self.destination.write(writer)?;
         self.amount.write(writer)?;
 
@@ -49,6 +51,7 @@ impl AnchorDeserialize for TransferMessage {
         match selector {
             PAYLOAD_TRANSFER => Ok(TransferMessage {
                 token: <[u8; 32]>::read(reader)?,
+                source: <[u8; 32]>::read(reader)?,
                 destination: <[u8; 32]>::read(reader)?,
                 amount: u64::read(reader)?,
             }),
@@ -60,169 +63,6 @@ impl AnchorDeserialize for TransferMessage {
     }
 }
 
-// impl AnchorSerialize for HelloWorldMessage {
-//     fn serialize<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
-//         match self {
-//             HelloWorldMessage::Alive { program_id } => {
-//                 PAYLOAD_ID_ALIVE.serialize(writer)?;
-//                 program_id.serialize(writer)
-//             }
-//             HelloWorldMessage::Hello { message } => {
-//                 if message.len() > HELLO_MESSAGE_MAX_LENGTH {
-//                     Err(io::Error::new(
-//                         io::ErrorKind::InvalidInput,
-//                         format!("message exceeds {HELLO_MESSAGE_MAX_LENGTH} bytes"),
-//                     ))
-//                 } else {
-//                     PAYLOAD_ID_HELLO.serialize(writer)?;
-//                     (message.len() as u16).to_be_bytes().serialize(writer)?;
-//                     for item in message {
-//                         item.serialize(writer)?;
-//                     }
-//                     Ok(())
-//                 }
-//             }
-//         }
-//     }
-// }
-//
-// impl AnchorDeserialize for HelloWorldMessage {
-//     fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
-//         //let inst = u8::read(reader)?;
-//         let message = <[u8; 11]>::read(reader)?;
-//         Ok(HelloWorldMessage::Hello {
-//             message: message.to_vec(),
-//         })
-//
-//         //Readable::read(reader)
-//     }
-// }
-
-//impl Readable for HelloWorldMessage {
-//     fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
-//         match buf[0] {
-//             PAYLOAD_ID_ALIVE => Ok(HelloWorldMessage::Alive {
-//                 program_id: Pubkey::try_from(&buf[1..33]).unwrap(),
-//             }),
-//             PAYLOAD_ID_HELLO => {
-//                 let length = {
-//                     let mut out = [0u8; 2];
-//                     out.copy_from_slice(&buf[1..3]);
-//                     u16::from_be_bytes(out) as usize
-//                 };
-//                 if length > HELLO_MESSAGE_MAX_LENGTH {
-//                     Err(io::Error::new(
-//                         io::ErrorKind::InvalidInput,
-//                         format!("message exceeds {HELLO_MESSAGE_MAX_LENGTH} bytes"),
-//                     ))
-//                 } else {
-//                     Ok(HelloWorldMessage::Hello {
-//                         message: buf[3..(3 + length)].to_vec(),
-//                     })
-//                 }
-//             }
-//             _ => Err(io::Error::new(
-//                 io::ErrorKind::InvalidInput,
-//                 "invalid payload ID",
-//             )),
-//         }
-//     }
-
-//     const SIZE: Option<usize> = Some(11);
-//
-//     fn read<R>(reader: &mut R) -> std::io::Result<Self>
-//     where
-//         Self: Sized,
-//         R: std::io::Read,
-//     {
-//         let message = <[u8; 11]>::read(reader)?;
-//         Ok(HelloWorldMessage::Hello {
-//             message: message.to_vec(),
-//         })
-//     }
-// }
-
-// #[cfg(test)]
-// pub mod test {
-//     use super::*;
-//     use anchor_lang::prelude::Result;
-//     use std::{mem::size_of, str, string::String};
-//
-//     #[test]
-//     fn test_message_alive() -> Result<()> {
-//         let my_program_id = Pubkey::new_unique();
-//         let msg = HelloWorldMessage::Alive {
-//             program_id: my_program_id,
-//         };
-//
-//         // Serialize program ID above.
-//         let mut encoded = Vec::new();
-//         msg.serialize(&mut encoded)?;
-//
-//         assert_eq!(encoded.len(), size_of::<u8>() + size_of::<Pubkey>());
-//
-//         // Verify Payload ID.
-//         assert_eq!(encoded[0], PAYLOAD_ID_ALIVE);
-//
-//         // Verify Program ID.
-//         let mut program_id_bytes = [0u8; 32];
-//         program_id_bytes.copy_from_slice(&encoded[1..33]);
-//         assert_eq!(program_id_bytes, my_program_id.to_bytes());
-//
-//         // Now deserialize the encoded message.
-//         match HelloWorldMessage::deserialize(&mut encoded.as_slice())? {
-//             HelloWorldMessage::Alive { program_id } => {
-//                 assert_eq!(program_id, my_program_id)
-//             }
-//             _ => assert!(false, "incorrect deserialization"),
-//         }
-//
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_message_hello() -> Result<()> {
-//         let raw_message = String::from("All your base are belong to us");
-//         let msg = HelloWorldMessage::Hello {
-//             message: raw_message.as_bytes().to_vec(),
-//         };
-//
-//         // Serialize message above.
-//         let mut encoded = Vec::new();
-//         msg.serialize(&mut encoded)?;
-//
-//         assert_eq!(
-//             encoded.len(),
-//             size_of::<u8>() + size_of::<u16>() + raw_message.len()
-//         );
-//
-//         // Verify Payload ID.
-//         assert_eq!(encoded[0], PAYLOAD_ID_HELLO);
-//
-//         // Verify message length.
-//         let mut message_len_bytes = [0u8; 2];
-//         message_len_bytes.copy_from_slice(&encoded[1..3]);
-//         assert_eq!(
-//             u16::from_be_bytes(message_len_bytes) as usize,
-//             raw_message.len()
-//         );
-//
-//         // Verify message.
-//         let from_utf8_result = str::from_utf8(&encoded[3..]);
-//         assert!(from_utf8_result.is_ok(), "from_utf8 resulted in an error");
-//         assert_eq!(from_utf8_result.unwrap(), raw_message);
-//
-//         // Now deserialize the encoded message.
-//         match HelloWorldMessage::deserialize(&mut encoded.as_slice())? {
-//             HelloWorldMessage::Hello { message } => {
-//                 assert_eq!(message, raw_message.as_bytes())
-//             }
-//             _ => assert!(false, "incorrect deserialization"),
-//         }
-//
-//         Ok(())
-//     }
-//
 //     #[test]
 //     fn test_message_hello_too_large() -> Result<()> {
 //         let n: usize = 513;

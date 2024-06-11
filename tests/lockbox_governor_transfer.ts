@@ -23,11 +23,11 @@ async function main() {
   const program = new Program(idl as anchor.Idl, PROGRAM_ID, anchor.getProvider());
 
   const chainId = 10002;
-  const sequence = 5;
+  const sequence = 6;
   const sol = new anchor.web3.PublicKey("So11111111111111111111111111111111111111112");
   const olas = new anchor.web3.PublicKey("Ez3nzG9ofodYCvEmw73XhQ87LWNYVRM2s7diB5tBZPyM");
   const wormhole = new anchor.web3.PublicKey("3u8hJUVTA4jH1wYAyUur7FFZVQ8H635K3tSHHF4ssjQ5");
-  const posted = new anchor.web3.PublicKey("GbY67sCAMj2CZAUzFiepZgf3Npqa7VtkCi7bbKRx8Pap");
+  const posted = new anchor.web3.PublicKey("BKcJAkiGjFiSwRU5RDTLHi1MnRpq2pCju54pmf9J4px4");
 
   // This corresponds to Sepolia timelock address 000000000000000000000000471b3f60f08c50dd0ecba1bcd113b66fcc02b63d or 0x471b3f60f08c50dd0ecba1bcd113b66fcc02b63d
   const timelockBuffer = Buffer.from([
@@ -39,10 +39,10 @@ async function main() {
   const timelock = new anchor.web3.PublicKey(timelockBuffer);
 
   const vaaHashTransfer = Buffer.from([
-     40,  36, 107,  71, 126, 222,  84, 234,
-    225,  87, 239, 143, 179, 232, 152,   9,
-    142,  51,  51,  95, 138,  99, 190, 216,
-    170, 207,  20, 189, 193, 230, 116, 238
+     64, 161, 162, 200,  20, 254,  13,  99,
+     66, 202, 163,  58, 255,  11, 192, 195,
+      9, 170,  28, 151,  86, 245,  81,   4,
+    157,   5,  66,  54,  19, 200, 115,  16
   ]);
 
   // User wallet is the provider payer
@@ -83,6 +83,7 @@ async function main() {
         true
     );
     console.log("Program PDA ATA for tokenA:", pdaTokenAccountA.address.toBase58());
+    //console.log("SOL PDA ATA in hex", bs58.decode(pdaTokenAccountA.address.toBase58()).toString("hex"));
 
     // Simulate SOL transfer and the sync of native SOL
     await provider.connection.requestAirdrop(pdaTokenAccountA.address, 100000000000);

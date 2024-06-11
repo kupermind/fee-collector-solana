@@ -87,13 +87,19 @@ pub mod lockbox_governor {
             ctx.accounts.posted.sequence()
         );
 
-        let TransferMessage { token, destination, amount } = posted_message.data();
+        let TransferMessage { token, source, destination, amount } = posted_message.data();
         let token_account = Pubkey::try_from(*token).unwrap();
+        let source_account = Pubkey::try_from(*source).unwrap();
         let destination_account = Pubkey::try_from(*destination).unwrap();
 
         // Check token mint
         require!(
             token_account == ctx.accounts.destination_account.mint,
+            GovernorError::InvalidMessage,
+        );
+        // Check source account
+        require!(
+            source_account == ctx.accounts.source_account.key(),
             GovernorError::InvalidMessage,
         );
         // Check destination account
@@ -104,17 +110,28 @@ pub mod lockbox_governor {
 
         msg!(
             "Token mint {:?}",
-            *token
+            token_account
+        );
+
+        msg!(
+            "Source {:?}",
+            source_account
         );
 
         msg!(
             "Destination {:?}",
-            *destination
+            destination_account
         );
 
         msg!(
             "Amount {:?}",
             *amount
+        );
+
+        let source_balance = ctx.accounts.source_account.amount;
+        msg!(
+            "Source balance {:?}",
+            source_balance
         );
 
     // Check that the token mint is SOL or OLAS
