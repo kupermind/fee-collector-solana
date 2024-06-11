@@ -118,10 +118,8 @@ async function main() {
     let chainIdBuffer = Buffer.alloc(2);
     chainIdBuffer.writeUInt16LE(chainId, 0);
     let sequenceBuffer = Buffer.alloc(8);
+    // NOTE! this needs to be adjusted with sequence number growing
     sequenceBuffer.writeUInt16LE(sequence, 0);
-
-    console.log(chainIdBuffer);
-    console.log(sequenceBuffer);
     const [pdaReceived, bumpReceived] = await anchor.web3.PublicKey.findProgramAddress([Buffer.from("received"),
         chainIdBuffer, sequenceBuffer], program.programId);
     //let bumpBytes = Buffer.from(new Uint8Array([bumpConfig]));

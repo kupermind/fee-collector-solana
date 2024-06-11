@@ -1,22 +1,22 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Token, TokenAccount, Transfer};
+use anchor_spl::token::{self, Transfer};
 use solana_program::{
     pubkey::Pubkey,
     program::invoke_signed,
     bpf_loader_upgradeable::set_upgrade_authority,
-    bpf_loader_upgradeable::upgrade,
-    system_program,
-    sysvar
+    bpf_loader_upgradeable::upgrade
 };
 use spl_token::instruction::{set_authority, AuthorityType};
 
 pub use context::*;
-pub use error::*;
+pub use errors::*;
+pub use events::*;
 pub use message::*;
 pub use state::*;
 
 pub mod context;
-pub mod error;
+pub mod errors;
+pub mod events;
 pub mod message;
 pub mod state;
 
@@ -26,7 +26,6 @@ declare_id!("DWDGo2UkBUFZ3VitBfWRBMvRnHr7E2DSh57NK27xMYaB");
 pub mod lockbox_governor {
     use super::*;
     use solana_program::pubkey;
-    //use anchor_lang::solana_program;
     use wormhole_anchor_sdk::wormhole;
 
     // SOL address
@@ -54,10 +53,6 @@ pub mod lockbox_governor {
         // so this value is stored as u8.
         config.finality = wormhole::Finality::Confirmed as u8;
 
-        // TODO Make this in a better way as a constant withing the state
-        // Get the anchor-derived bump
-        //let bump = ctx.bumps.config;
-
         // Assign initialization parameters
         config.bump = [ctx.bumps.config];
         config.chain = chain;
@@ -66,8 +61,6 @@ pub mod lockbox_governor {
         // Set zero initial values
         config.total_sol_transferred = 0;
         config.total_olas_transferred = 0;
-        // Zero means no batching
-        config.batch_id = 0;
 
         Ok(())
     }
@@ -100,6 +93,12 @@ pub mod lockbox_governor {
         amount
     )?;
 
+    emit!(TransferEvent {
+        signer: ctx.accounts.signer.key(),
+        token: ctx.accounts.collector_account.mint,
+        amount
+    });
+
     Ok(())
   }
 
@@ -120,6 +119,8 @@ pub mod lockbox_governor {
     // Get all amounts
     let amount_sol = ctx.accounts.collector_account_sol.amount;
     let amount_olas = ctx.accounts.collector_account_olas.amount;
+    ctx.accounts.config.total_sol_transferred += amount_sol;
+    ctx.accounts.config.total_olas_transferred += amount_olas;
 
     // TODO optimize with creating context and calling transfer one by one
     // Transfer the amount of SOL
@@ -149,6 +150,12 @@ pub mod lockbox_governor {
         ),
         amount_olas,
     )?;
+
+    emit!(TransferAllEvent {
+        signer: ctx.accounts.signer.key(),
+        amount_sol,
+        amount_olas
+    });
 
     Ok(())
   }
@@ -304,151 +311,4 @@ pub mod lockbox_governor {
         // Done
         Ok(())
     }
-}
-
-#[derive(Accounts)]
-pub struct InitializeLockboxGovernor<'info> {
-  #[account(mut)]
-  pub signer: Signer<'info>,
-
-    #[account(
-        init,
-        payer = signer,
-        seeds = [Config::SEED_PREFIX],
-        bump,
-        space = Config::MAXIMUM_SIZE
-    )]
-    /// Config account, which saves program data useful for other instructions.
-    pub config: Account<'info, Config>,
-
-  #[account(address = system_program::ID)]
-  pub system_program: Program<'info, System>,
-  #[account(address = sysvar::rent::ID)]
-  pub rent: Sysvar<'info, Rent>
-}
-
-#[derive(Accounts)]
-pub struct TransferLockboxGovernor<'info> {
-  #[account(mut)]
-  pub signer: Signer<'info>,
-
-  #[account(mut)]
-  pub config: Box<Account<'info, Config>>,
-
-  #[account(mut)]
-  pub collector_account: Box<Account<'info, TokenAccount>>,
-
-  #[account(mut)]
-  pub destination_account: Box<Account<'info, TokenAccount>>,
-
-  #[account(address = token::ID)]
-  pub token_program: Program<'info, Token>
-}
-
-#[derive(Accounts)]
-pub struct TransferAllLockboxGovernor<'info> {
-  #[account(mut)]
-  pub signer: Signer<'info>,
-
-  #[account(mut)]
-  pub config: Box<Account<'info, Config>>,
-
-  #[account(mut)]
-  pub collector_account_sol: Box<Account<'info, TokenAccount>>,
-
-  #[account(mut)]
-  pub collector_account_olas: Box<Account<'info, TokenAccount>>,
-
-  #[account(mut)]
-  pub destination_account_sol: Box<Account<'info, TokenAccount>>,
-
-  #[account(mut)]
-  pub destination_account_olas: Box<Account<'info, TokenAccount>>,
-
-  #[account(address = token::ID)]
-  pub token_program: Program<'info, Token>
-}
-
-#[derive(Accounts)]
-pub struct TransferTokenAccountsLockboxGovernor<'info> {
-  #[account(mut)]
-  pub signer: Signer<'info>,
-
-  #[account(mut)]
-  pub config: Box<Account<'info, Config>>,
-
-  #[account(mut)]
-  pub collector_account_sol: Box<Account<'info, TokenAccount>>,
-
-  #[account(mut)]
-  pub collector_account_olas: Box<Account<'info, TokenAccount>>,
-
-  /// CHECK: Check later
-  #[account(mut)]
-  pub destination: UncheckedAccount<'info>,
-
-  #[account(address = token::ID)]
-  pub token_program: Program<'info, Token>
-}
-
-#[derive(Accounts)]
-pub struct ChangeUpgradeAuthorityLockboxGovernor<'info> {
-  #[account(mut)]
-  pub signer: Signer<'info>,
-
-  /// CHECK: Check later
-  #[account(mut)]
-  pub program_to_update_authority: UncheckedAccount<'info>,
-
-  /// CHECK: Check later
-  #[account(mut)]
-  pub program_data_to_update_authority: UncheckedAccount<'info>,
-
-  #[account(mut)]
-  pub config: Box<Account<'info, Config>>,
-
-  /// CHECK: Check later
-  #[account(mut)]
-  pub destination: UncheckedAccount<'info>,
-}
-
-#[derive(Accounts)]
-pub struct UpgradeProgramLockboxGovernor<'info> {
-  #[account(mut)]
-  pub signer: Signer<'info>,
-
-  /// CHECK: Check later
-  #[account(mut)]
-  pub program_address: UncheckedAccount<'info>,
-
-  /// CHECK: Check later
-  #[account(mut)]
-  pub program_data_address: UncheckedAccount<'info>,
-
-  /// CHECK: Check later
-  #[account(mut)]
-  pub buffer_address: UncheckedAccount<'info>,
-
-  #[account(mut)]
-  pub spill_address: Box<Account<'info, TokenAccount>>,
-
-  #[account(mut)]
-  pub config: Box<Account<'info, Config>>,
-
-  #[account(address = sysvar::rent::ID)]
-  pub rent: Sysvar<'info, Rent>,
-  #[account(address = sysvar::clock::ID)]
-  pub clock: Sysvar<'info, Clock>
-}
-
-
-#[event]
-pub struct TransferEvent {
-  // Signer (user)
-  #[index]
-  pub signer: Pubkey,
-  // SOL amount transferred
-  pub sol_transferred: u64,
-  // OLAS amount transferred
-  pub olas_transferred: u64
 }

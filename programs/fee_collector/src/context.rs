@@ -1,8 +1,13 @@
 use anchor_lang::prelude::*;
 use wormhole_anchor_sdk::wormhole;
+use anchor_spl::token::{self, Token, TokenAccount};
+use solana_program::{
+    system_program,
+    sysvar
+};
 
 use crate::{
-    error::GovernorError,
+    errors::GovernorError,
     message::GovernorMessage,
     state::{Config, Received},
 };
@@ -90,4 +95,139 @@ pub struct ReceiveMessage<'info> {
 
     /// System program.
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct InitializeLockboxGovernor<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
+    #[account(
+        init,
+        payer = signer,
+        seeds = [Config::SEED_PREFIX],
+        bump,
+        space = Config::MAXIMUM_SIZE
+    )]
+    /// Config account, which saves program data useful for other instructions.
+    pub config: Account<'info, Config>,
+
+    #[account(address = system_program::ID)]
+    pub system_program: Program<'info, System>,
+    #[account(address = sysvar::rent::ID)]
+    pub rent: Sysvar<'info, Rent>
+}
+
+#[derive(Accounts)]
+pub struct TransferLockboxGovernor<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
+    #[account(mut)]
+    pub config: Box<Account<'info, Config>>,
+
+    #[account(mut)]
+    pub collector_account: Box<Account<'info, TokenAccount>>,
+
+    #[account(mut)]
+    pub destination_account: Box<Account<'info, TokenAccount>>,
+
+    #[account(address = token::ID)]
+    pub token_program: Program<'info, Token>
+}
+
+#[derive(Accounts)]
+pub struct TransferAllLockboxGovernor<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
+    #[account(mut)]
+    pub config: Box<Account<'info, Config>>,
+
+    #[account(mut)]
+    pub collector_account_sol: Box<Account<'info, TokenAccount>>,
+
+    #[account(mut)]
+    pub collector_account_olas: Box<Account<'info, TokenAccount>>,
+
+    #[account(mut)]
+    pub destination_account_sol: Box<Account<'info, TokenAccount>>,
+
+    #[account(mut)]
+    pub destination_account_olas: Box<Account<'info, TokenAccount>>,
+
+    #[account(address = token::ID)]
+    pub token_program: Program<'info, Token>
+}
+
+#[derive(Accounts)]
+pub struct TransferTokenAccountsLockboxGovernor<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
+    #[account(mut)]
+    pub config: Box<Account<'info, Config>>,
+
+    #[account(mut)]
+    pub collector_account_sol: Box<Account<'info, TokenAccount>>,
+
+    #[account(mut)]
+    pub collector_account_olas: Box<Account<'info, TokenAccount>>,
+
+    /// CHECK: Check later
+    #[account(mut)]
+    pub destination: UncheckedAccount<'info>,
+
+    #[account(address = token::ID)]
+    pub token_program: Program<'info, Token>
+}
+
+#[derive(Accounts)]
+pub struct ChangeUpgradeAuthorityLockboxGovernor<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
+    /// CHECK: Check later
+    #[account(mut)]
+    pub program_to_update_authority: UncheckedAccount<'info>,
+
+    /// CHECK: Check later
+    #[account(mut)]
+    pub program_data_to_update_authority: UncheckedAccount<'info>,
+
+    #[account(mut)]
+    pub config: Box<Account<'info, Config>>,
+
+    /// CHECK: Check later
+    #[account(mut)]
+    pub destination: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
+pub struct UpgradeProgramLockboxGovernor<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
+    /// CHECK: Check later
+    #[account(mut)]
+    pub program_address: UncheckedAccount<'info>,
+
+    /// CHECK: Check later
+    #[account(mut)]
+    pub program_data_address: UncheckedAccount<'info>,
+
+    /// CHECK: Check later
+    #[account(mut)]
+    pub buffer_address: UncheckedAccount<'info>,
+
+    #[account(mut)]
+    pub spill_address: Box<Account<'info, TokenAccount>>,
+
+    #[account(mut)]
+    pub config: Box<Account<'info, Config>>,
+
+    #[account(address = sysvar::rent::ID)]
+    pub rent: Sysvar<'info, Rent>,
+    #[account(address = sysvar::clock::ID)]
+    pub clock: Sysvar<'info, Clock>
 }

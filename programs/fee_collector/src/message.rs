@@ -2,12 +2,16 @@ use anchor_lang::{prelude::Pubkey, AnchorDeserialize, AnchorSerialize};
 use std::io;
 use wormhole_io::{Readable, Writeable};
 
-const PAYLOAD_ID_ALIVE: u8 = 0;
-const PAYLOAD_ID_HELLO: u8 = 1;
+const PAYLOAD_TRANSFER: u8 = 0;
+const PAYLOAD_TRANSFER_ALL: u8 = 1;
+const PAYLOAD_TRANSFER_ACCOUNTS: u8 = 2;
+const PAYLOAD_TRANSFER_TOKEN_ACCOUNTS: u8 = 3;
+const PAYLOAD_CHANGE_UPGRADE_AUTHORITY: u8 = 4;
+const PAYLOAD_UPGRADE_PROGRAM: u8 = 5;
 
 pub const HELLO_MESSAGE_MAX_LENGTH: usize = 512;
 
-#[derive(Clone)]
+//#[derive(Clone)]
 /// Expected message types for this program. Only valid payloads are:
 /// * `Alive`: Payload ID == 0. Emitted when [`initialize`](crate::initialize)
 ///  is called).
@@ -15,10 +19,10 @@ pub const HELLO_MESSAGE_MAX_LENGTH: usize = 512;
 /// [`send_message`](crate::send_message) is called).
 ///
 /// Payload IDs are encoded as u8.
-pub enum HelloWorldMessage {
-    Alive { program_id: Pubkey },
-    Hello { message: Vec<u8> },
-}
+// pub enum HelloWorldMessage {
+//     Alive { program_id: Pubkey },
+//     Hello { message: Vec<u8> },
+// }
 
 #[derive(Clone)]
 pub struct GovernorMessage {
@@ -43,43 +47,43 @@ impl AnchorDeserialize for GovernorMessage {
     }
 }
 
-impl AnchorSerialize for HelloWorldMessage {
-    fn serialize<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
-        match self {
-            HelloWorldMessage::Alive { program_id } => {
-                PAYLOAD_ID_ALIVE.serialize(writer)?;
-                program_id.serialize(writer)
-            }
-            HelloWorldMessage::Hello { message } => {
-                if message.len() > HELLO_MESSAGE_MAX_LENGTH {
-                    Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("message exceeds {HELLO_MESSAGE_MAX_LENGTH} bytes"),
-                    ))
-                } else {
-                    PAYLOAD_ID_HELLO.serialize(writer)?;
-                    (message.len() as u16).to_be_bytes().serialize(writer)?;
-                    for item in message {
-                        item.serialize(writer)?;
-                    }
-                    Ok(())
-                }
-            }
-        }
-    }
-}
-
-impl AnchorDeserialize for HelloWorldMessage {
-    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
-        //let inst = u8::read(reader)?;
-        let message = <[u8; 11]>::read(reader)?;
-        Ok(HelloWorldMessage::Hello {
-            message: message.to_vec(),
-        })
-
-        //Readable::read(reader)
-    }
-}
+// impl AnchorSerialize for HelloWorldMessage {
+//     fn serialize<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
+//         match self {
+//             HelloWorldMessage::Alive { program_id } => {
+//                 PAYLOAD_ID_ALIVE.serialize(writer)?;
+//                 program_id.serialize(writer)
+//             }
+//             HelloWorldMessage::Hello { message } => {
+//                 if message.len() > HELLO_MESSAGE_MAX_LENGTH {
+//                     Err(io::Error::new(
+//                         io::ErrorKind::InvalidInput,
+//                         format!("message exceeds {HELLO_MESSAGE_MAX_LENGTH} bytes"),
+//                     ))
+//                 } else {
+//                     PAYLOAD_ID_HELLO.serialize(writer)?;
+//                     (message.len() as u16).to_be_bytes().serialize(writer)?;
+//                     for item in message {
+//                         item.serialize(writer)?;
+//                     }
+//                     Ok(())
+//                 }
+//             }
+//         }
+//     }
+// }
+//
+// impl AnchorDeserialize for HelloWorldMessage {
+//     fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+//         //let inst = u8::read(reader)?;
+//         let message = <[u8; 11]>::read(reader)?;
+//         Ok(HelloWorldMessage::Hello {
+//             message: message.to_vec(),
+//         })
+//
+//         //Readable::read(reader)
+//     }
+// }
 
 //impl Readable for HelloWorldMessage {
 //     fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {

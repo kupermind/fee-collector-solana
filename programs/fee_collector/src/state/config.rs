@@ -25,9 +25,6 @@ impl WormholeAddresses {
 pub struct Config {
     /// Wormhole program's relevant addresses.
     pub wormhole: WormholeAddresses,
-    /// AKA nonce. Just zero, but saving this information in this account
-    /// anyway.
-    pub batch_id: u32,
     /// AKA consistency level. u8 representation of Solana's
     /// [Finality](wormhole_anchor_sdk::wormhole::Finality).
     pub finality: u8,
@@ -46,7 +43,6 @@ pub struct Config {
 impl Config {
     pub const MAXIMUM_SIZE: usize = 8 // discriminator
         + WormholeAddresses::LEN
-        + 4  // batch_id
         + 1  // finality
         + 1  // bump
         + 2  // chain Id
@@ -84,7 +80,6 @@ pub mod test {
             Config::MAXIMUM_SIZE, 
             size_of::<u64>()
             + size_of::<WormholeAddresses>()
-            + size_of::<u32>()
             + size_of::<u8>()
             + size_of::<u8>()
             + size_of::<u16>()
