@@ -3,7 +3,8 @@ use wormhole_anchor_sdk::wormhole;
 use anchor_spl::token::{self, Token, TokenAccount};
 use solana_program::{
     system_program,
-    sysvar
+    sysvar,
+    bpf_loader_upgradeable
 };
 
 use crate::{
@@ -380,6 +381,10 @@ pub struct SetUpgradeAuthorityLockboxGovernor<'info> {
     /// CHECK: Check later
     #[account(mut)]
     pub upgrade_authority_account: UncheckedAccount<'info>,
+
+    /// CHECK: Check later
+    #[account(address = bpf_loader_upgradeable::ID)]
+    pub bpf_loader_upgradeable: UncheckedAccount<'info>,
 
     /// System program
     pub system_program: Program<'info, System>,

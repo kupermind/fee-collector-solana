@@ -349,8 +349,8 @@ pub mod lockbox_governor {
         Ok(())
     }
 
-    /// Change upgrade authority.
-    pub fn change_upgrade_authority(
+    /// Set program upgrade authority.
+    pub fn set_program_upgrade_authority(
         ctx: Context<SetUpgradeAuthorityLockboxGovernor>,
         vaa_hash: [u8; 32]
     ) -> Result<()> {
@@ -360,6 +360,9 @@ pub mod lockbox_governor {
         let program_account = Pubkey::try_from(*program_id_bytes).unwrap();
         let upgrade_authority_account = Pubkey::try_from(*upgrade_authority).unwrap();
 
+        msg!("Program account {:?}", program_account);
+        msg!("Upgrade authority {:?}", upgrade_authority_account);
+
         // Check program account that changes the authority
         if program_account != ctx.accounts.program_account.key() {
             return Err(GovernorError::WrongAccount.into());
@@ -368,7 +371,7 @@ pub mod lockbox_governor {
         if upgrade_authority_account != ctx.accounts.upgrade_authority_account.key() {
             return Err(GovernorError::WrongAccount.into());
         }
-    
+
         // Change upgrade authority
         invoke_signed(
             &set_upgrade_authority(
@@ -458,54 +461,4 @@ pub mod lockbox_governor {
 
         Ok(())
     }
-
-//     /// This instruction reads a posted verified Wormhole message and verifies
-//     /// that the payload is of type [HelloWorldMessage::Hello] (payload ID == 1). HelloWorldMessage
-//     /// data is stored in a [Received] account.
-//     ///
-//     /// See [HelloWorldMessage] enum for deserialization implementation.
-//     ///
-//     /// # Arguments
-//     ///
-//     /// * `vaa_hash` - Keccak256 hash of verified Wormhole message
-//     pub fn receive_message(ctx: Context<ReceiveMessage>, vaa_hash: [u8; 32]) -> Result<()> {
-//         let posted_message = &ctx.accounts.posted;
-//
-//         msg!(
-//             "Foreign emitter {:?}",
-//             ctx.accounts.posted.emitter_address()
-//         );
-//
-//         msg!(
-//             "Emitter chain {:?}",
-//             ctx.accounts.posted.emitter_chain()
-//         );
-//
-//         msg!(
-//             "Sequence {:?}",
-//             ctx.accounts.posted.sequence()
-//         );
-//
-//         let GovernorMessage { message } = posted_message.data();
-//         // GovernorMessage cannot be larger than the maximum size of the account.
-//         require!(
-//             message.len() <= MESSAGE_MAX_LENGTH,
-//             GovernorError::InvalidMessage,
-//         );
-//
-//
-//         msg!(
-//             "Message {:?}",
-//             message
-//         );
-//
-//         // Save batch ID, keccak256 hash and message payload.
-//         let received = &mut ctx.accounts.received;
-//         received.batch_id = posted_message.batch_id();
-//         received.wormhole_message_hash = vaa_hash;
-//         received.message = message.clone();
-//
-//         // Done
-//         Ok(())
-//     }
 }

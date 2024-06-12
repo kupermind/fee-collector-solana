@@ -7,15 +7,23 @@ import {
 } from "@solana/spl-token";
 import expect from "expect";
 import fs from "fs";
-import bs58 from "bs58";
 
-// NOTE: DEPRECATED TEST SCENARIO
+// NOTE!!!! Make sure you run lockbox_governor_init.ts script first to initialize the governor program
+// NOTE!!!! Run this script only after all the following steps are executed strictly in order:
+// 1. Deploy governor program
+// 2. Deploy liquidity_lockbox (1okwt4nGbpr82kkr6t1767sAenfeZBxUyzJAAaumZRG) from artifacts or use another key-pair
+//    Make sure you are the program authority. Example:
+//      solana program deploy --program-id 1okwt4nGbpr82kkr6t1767sAenfeZBxUyzJAAaumZRG.json artifacts/liquidity_lockbox.so --url localhost
+//    Check authority:
+//      solana program show 1okwt4nGbpr82kkr6t1767sAenfeZBxUyzJAAaumZRG --url localhost
+// 3. Change the deployed program authority to pdaConfig (CuZVidD5KhTGN2jc931uH4EBAErzYWCUiLJUVA9NtLHw). Example:
+//    solana program set-upgrade-authority 1okwt4nGbpr82kkr6t1767sAenfeZBxUyzJAAaumZRG --new-upgrade-authority CuZVidD5KhTGN2jc931uH4EBAErzYWCUiLJUVA9NtLHw --skip-new-upgrade-authority-signer-check --url localhost
+
 // UNIX/Linux/Mac
 // bash$ export ANCHOR_PROVIDER_URL=http://127.0.0.1:8899
 // bash$ export ANCHOR_WALLET=artifacts/id.json
 
 async function main() {
-
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
@@ -24,11 +32,14 @@ async function main() {
   const program = new Program(idl as anchor.Idl, PROGRAM_ID, anchor.getProvider());
 
   const chainId = 10002;
-  const sequence = 1;
-  const sol = new anchor.web3.PublicKey("So11111111111111111111111111111111111111112");
-  const olas = new anchor.web3.PublicKey("Ez3nzG9ofodYCvEmw73XhQ87LWNYVRM2s7diB5tBZPyM");
+  const sequence = 10;
+
+  // Deploy this manually with the solana program deploy...
+  const lockbox = new anchor.web3.PublicKey("1okwt4nGbpr82kkr6t1767sAenfeZBxUyzJAAaumZRG");
+  const lockboxData = new anchor.web3.PublicKey("Gdt3RDEQmw51NCcUJ13tXR6nj9sgKMaZe1Pic8JSRDfb");
   const wormhole = new anchor.web3.PublicKey("3u8hJUVTA4jH1wYAyUur7FFZVQ8H635K3tSHHF4ssjQ5");
-  const posted = new anchor.web3.PublicKey("4XRXuLFfa2pT56JNtjCsGLpG9yriYt8pr3D2GseYpfkP");
+  const posted = new anchor.web3.PublicKey("95qM8dmVpx56goCr7MuPSR8sXidTWoehtopGMRew7PDT");
+  const bpfLoaderUpgradeable = new anchor.web3.PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
 
   // This corresponds to Sepolia timelock address 000000000000000000000000471b3f60f08c50dd0ecba1bcd113b66fcc02b63d or 0x471b3f60f08c50dd0ecba1bcd113b66fcc02b63d
   const timelockBuffer = Buffer.from([
@@ -39,17 +50,16 @@ async function main() {
   ]);
   const timelock = new anchor.web3.PublicKey(timelockBuffer);
 
-  const vaaHash = Buffer.from([
-    238, 250, 138, 215,  81, 181, 253,
-    141, 100, 108, 178, 123, 104, 115,
-    183,  68, 161, 114, 198,  22, 168,
-    149, 101, 175,   9, 190, 140, 180,
-    220,  73, 133, 109
+  const vaaHashSetUpgradeAuthority = Buffer.from([
+     94, 235, 172,  52,  76,  40, 232,  39,
+    114,  94,  25,  50, 200, 246, 118, 221,
+    183, 171, 212, 155,  85,  31, 132,  71,
+    221,  18, 141, 249, 246,  44, 164, 115
   ]);
 
   // User wallet is the provider payer
   const userWallet = provider.wallet["payer"];
-  console.log("timelock", timelock.toBase58());
+  console.log("User wallet:", userWallet.publicKey.toBase58());
 
     // Find a PDA account for the lockbox governor program
     const [pdaConfig, bumpConfig] = await anchor.web3.PublicKey.findProgramAddress([Buffer.from("config", "utf-8")],
@@ -57,63 +67,6 @@ async function main() {
     //let bumpBytes = Buffer.from(new Uint8Array([bumpConfig]));
     console.log("Lockbox Governor PDA address:", pdaConfig.toBase58());
     console.log("Lockbox Governor PDA bump:", bumpConfig);
-
-    let accountInfo = await provider.connection.getAccountInfo(olas);
-    //console.log(accountInfo);
-
-    // Get the tokenA ATA of the userWallet address, and if it does not exist, create it
-    const tokenOwnerAccountA = await getOrCreateAssociatedTokenAccount(
-        provider.connection,
-        userWallet,
-        sol,
-        userWallet.publicKey
-    );
-    console.log("User ATA for tokenA:", tokenOwnerAccountA.address.toBase58());
-
-    // Simulate SOL transfer and the sync of native SOL
-    await provider.connection.requestAirdrop(tokenOwnerAccountA.address, 100000000000);
-    await syncNative(provider.connection, userWallet, tokenOwnerAccountA.address);
-
-    // Get the tokenA ATA of the userWallet address, and if it does not exist, create it
-    const tokenOwnerAccountB = await getOrCreateAssociatedTokenAccount(
-        provider.connection,
-        userWallet,
-        olas,
-        userWallet.publicKey
-    );
-    console.log("User ATA for tokenB:", tokenOwnerAccountB.address.toBase58());
-
-  let signature = null;
-
-    // Initialize the LockboxGovernor program
-    try {
-        signature = await program.methods
-          .initialize(chainId, timelockBuffer)
-          .accounts(
-            {
-              config: pdaConfig,
-            }
-          )
-          .rpc();
-    } catch (error) {
-        if (error instanceof Error && "message" in error) {
-            console.error("Program Error:", error);
-            console.error("Error Message:", error.message);
-        } else {
-            console.error("Transaction Error:", error);
-        }
-    }
-    //console.log("Your transaction signature", signature);
-    // Wait for program creation confirmation
-    await provider.connection.confirmTransaction({
-        signature: signature,
-        ...(await provider.connection.getLatestBlockhash()),
-    });
-
-    console.log("Successfully initialized lockbox governor");
-
-    accountInfo = await provider.connection.getAccountInfo(pdaConfig);
-    //console.log(accountInfo);
 
     // Find a PDA account for the lockbox governor program
     let chainIdBuffer = Buffer.alloc(2);
@@ -127,16 +80,21 @@ async function main() {
     console.log("Received PDA address:", pdaReceived.toBase58());
     console.log("Received PDA bump:", bumpReceived);
 
-    // Receive message
+    let signature = null;
+    // Set upgrade authority back
     try {
         signature = await program.methods
-          .receiveMessage(vaaHash)
+          .setProgramUpgradeAuthority(vaaHashSetUpgradeAuthority)
           .accounts(
             {
               config: pdaConfig,
               wormholeProgram: wormhole,
               posted,
-              received: pdaReceived
+              received: pdaReceived,
+              programAccount: lockbox,
+              programDataAccount: lockboxData,
+              upgradeAuthorityAccount: userWallet.publicKey,
+              bpfLoaderUpgradeable
             }
           )
           .rpc();
@@ -148,6 +106,7 @@ async function main() {
             console.error("Transaction Error:", error);
         }
     }
+
     //console.log("Your transaction signature", signature);
     // Wait for program creation confirmation
     await provider.connection.confirmTransaction({
@@ -155,7 +114,7 @@ async function main() {
         ...(await provider.connection.getLatestBlockhash()),
     });
 
-    console.log("Successfully received the message");
+    console.log("Successfully transferred program to a specified authority");
 }
 
 main();
