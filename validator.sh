@@ -8,4 +8,5 @@ solana-test-validator --bpf-program DWDGo2UkBUFZ3VitBfWRBMvRnHr7E2DSh57NK27xMYaB
 --account GMrUcHq2vhZQDc2npr2AwBbmmQUgyJ3RfHAz9W34kmLX fork_accounts/GMrUcHq2vhZQDc2npr2AwBbmmQUgyJ3RfHAz9W34kmLX.json \
 --account 2k9zy4sou95GohxJjCTJLXTYCMy9LwUt3GqUyCHEZBpb fork_accounts/2k9zy4sou95GohxJjCTJLXTYCMy9LwUt3GqUyCHEZBpb.json \
 --account 95qM8dmVpx56goCr7MuPSR8sXidTWoehtopGMRew7PDT fork_accounts/95qM8dmVpx56goCr7MuPSR8sXidTWoehtopGMRew7PDT.json \
+--account E38UK6Ar9ZUPMrDzyZoct8rQseyJGsfHYEpuk6TZKG9A fork_accounts/E38UK6Ar9ZUPMrDzyZoct8rQseyJGsfHYEpuk6TZKG9A.json \
 -r

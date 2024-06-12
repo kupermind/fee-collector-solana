@@ -55,6 +55,7 @@ solana airdrop 10000 9fit3w7t6FHATDaZWotpWqN7NpqgL3Lm1hqUop4hAy8h --url localhos
 solana airdrop 10000 9fit3w7t6FHATDaZWotpWqN7NpqgL3Lm1hqUop4hAy8h --url localhost && npx ts-node tests/lockbox_governor_transfer_all.ts
 solana airdrop 10000 9fit3w7t6FHATDaZWotpWqN7NpqgL3Lm1hqUop4hAy8h --url localhost && npx ts-node tests/lockbox_governor_transfer_token_accounts.ts
 solana airdrop 10000 9fit3w7t6FHATDaZWotpWqN7NpqgL3Lm1hqUop4hAy8h --url localhost && npx ts-node tests/lockbox_governor_set_upgrade_authority.ts
+solana airdrop 10000 9fit3w7t6FHATDaZWotpWqN7NpqgL3Lm1hqUop4hAy8h --url localhost && npx ts-node tests/lockbox_governor_upgrade_program.ts
 ```
 
 The deployed program ID must be `DWDGo2UkBUFZ3VitBfWRBMvRnHr7E2DSh57NK27xMYaB` and corresponds to the `declare_id`

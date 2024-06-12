@@ -423,7 +423,7 @@ pub mod lockbox_governor {
             return Err(GovernorError::WrongAccount.into());
         }
         // Check spill account
-        if buffer_account != ctx.accounts.spill_account.key() {
+        if spill_account != ctx.accounts.spill_account.key() {
             return Err(GovernorError::WrongAccount.into());
         }
 
