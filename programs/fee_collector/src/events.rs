@@ -45,5 +45,34 @@ pub struct TransferTokenAccountsEvent {
     pub source_account_olas: Pubkey,
     // New owner destination account address
     #[index]
-    pub destination_account: Pubkey,
+    pub destination_account: Pubkey
+}
+
+#[event]
+pub struct SetUpgradeAuthorityEvent {
+    // Signer (user)
+    #[index]
+    pub signer: Pubkey,
+    // Program account address
+    #[index]
+    pub program_account: Pubkey,
+    // New authority destination account address
+    #[index]
+    pub upgrade_authority_account: Pubkey
+}
+
+#[event]
+pub struct UpgradeProgramEvent {
+    // Signer (user)
+    #[index]
+    pub signer: Pubkey,
+    // Program account address
+    #[index]
+    pub program_account: Pubkey,
+    // New program buffer account address
+    #[index]
+    pub buffer_account: Pubkey,
+    // Spill account address
+    #[index]
+    pub spill_account: Pubkey
 }

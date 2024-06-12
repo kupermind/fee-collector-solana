@@ -93,11 +93,11 @@ pub mod lockbox_governor {
 
         // Check source account
         if source_account != ctx.accounts.source_account.key() {
-            return Err(GovernorError::WrongTokenAccount.into());
+            return Err(GovernorError::WrongAccount.into());
         }
         // Check destination account
         if destination_account != ctx.accounts.destination_account.key() {
-            return Err(GovernorError::WrongTokenAccount.into());
+            return Err(GovernorError::WrongAccount.into());
         }
 
         msg!(
@@ -187,17 +187,17 @@ pub mod lockbox_governor {
 
         // Check source accounts
         if source_account_sol != ctx.accounts.source_account_sol.key() {
-            return Err(GovernorError::WrongTokenAccount.into());
+            return Err(GovernorError::WrongAccount.into());
         }
         if source_account_olas != ctx.accounts.source_account_olas.key() {
-            return Err(GovernorError::WrongTokenAccount.into());
+            return Err(GovernorError::WrongAccount.into());
         }
         // Check destination accounts
         if destination_account_sol != ctx.accounts.destination_account_sol.key() {
-            return Err(GovernorError::WrongTokenAccount.into());
+            return Err(GovernorError::WrongAccount.into());
         }
         if destination_account_olas != ctx.accounts.destination_account_olas.key() {
-            return Err(GovernorError::WrongTokenAccount.into());
+            return Err(GovernorError::WrongAccount.into());
         }
 
         // Check that the first token mint is SOL
@@ -264,7 +264,7 @@ pub mod lockbox_governor {
         Ok(())
     }
 
-    /// Transfer token account.
+    /// Transfer token accounts.
     pub fn transfer_token_accounts(
         ctx: Context<TransferTokenAccountsLockboxGovernor>,
         vaa_hash: [u8; 32]
@@ -278,14 +278,14 @@ pub mod lockbox_governor {
 
         // Check source accounts
         if source_account_sol != ctx.accounts.source_account_sol.key() {
-            return Err(GovernorError::WrongTokenAccount.into());
+            return Err(GovernorError::WrongAccount.into());
         }
         if source_account_olas != ctx.accounts.source_account_olas.key() {
-            return Err(GovernorError::WrongTokenAccount.into());
+            return Err(GovernorError::WrongAccount.into());
         }
-        // Check destination accounts
+        // Check destination account
         if destination_account != ctx.accounts.destination_account.key() {
-            return Err(GovernorError::WrongTokenAccount.into());
+            return Err(GovernorError::WrongAccount.into());
         }
 
         // Check that the first token mint is SOL
@@ -351,23 +351,49 @@ pub mod lockbox_governor {
 
     /// Change upgrade authority.
     pub fn change_upgrade_authority(
-        ctx: Context<ChangeUpgradeAuthorityLockboxGovernor>,
+        ctx: Context<SetUpgradeAuthorityLockboxGovernor>,
         vaa_hash: [u8; 32]
     ) -> Result<()> {
+        let posted_message = &ctx.accounts.posted;
+
+        let SetUpgradeAuthorityMessage { program_id_bytes, upgrade_authority } = posted_message.data();
+        let program_account = Pubkey::try_from(*program_id_bytes).unwrap();
+        let upgrade_authority_account = Pubkey::try_from(*upgrade_authority).unwrap();
+
+        // Check program account that changes the authority
+        if program_account != ctx.accounts.program_account.key() {
+            return Err(GovernorError::WrongAccount.into());
+        }
+        // Check authority destination account
+        if upgrade_authority_account != ctx.accounts.upgrade_authority_account.key() {
+            return Err(GovernorError::WrongAccount.into());
+        }
+    
         // Change upgrade authority
         invoke_signed(
             &set_upgrade_authority(
-                ctx.accounts.program_to_update_authority.to_account_info().key,
+                ctx.accounts.program_account.to_account_info().key,
                 ctx.accounts.config.to_account_info().key,
-                Some(ctx.accounts.destination.to_account_info().key)
+                Some(ctx.accounts.upgrade_authority_account.to_account_info().key)
             ),
             &[
-                ctx.accounts.program_data_to_update_authority.to_account_info(),
+                ctx.accounts.program_data_account.to_account_info(),
                 ctx.accounts.config.to_account_info(),
-                ctx.accounts.destination.to_account_info()
+                ctx.accounts.upgrade_authority_account.to_account_info()
             ],
             &[&ctx.accounts.config.seeds()]
         )?;
+
+        // Save batch ID, keccak256 hash and governor message sequence.
+        ctx.accounts.received.batch_id = posted_message.batch_id();
+        ctx.accounts.received.wormhole_message_hash = vaa_hash;
+        ctx.accounts.received.sequence = posted_message.sequence();
+
+        emit!(SetUpgradeAuthorityEvent {
+            signer: ctx.accounts.signer.key(),
+            program_account,
+            upgrade_authority_account
+        });
 
         Ok(())
     }
@@ -377,25 +403,58 @@ pub mod lockbox_governor {
         ctx: Context<UpgradeProgramLockboxGovernor>,
         vaa_hash: [u8; 32]
     ) -> Result<()> {
+        let posted_message = &ctx.accounts.posted;
+
+        let UpgradeProgramMessage { program_id_bytes, buffer_account_bytes, spill_account_bytes } =
+            posted_message.data();
+        let program_account = Pubkey::try_from(*program_id_bytes).unwrap();
+        let buffer_account = Pubkey::try_from(*buffer_account_bytes).unwrap();
+        let spill_account = Pubkey::try_from(*spill_account_bytes).unwrap();
+
+        // Check program account that changes the authority
+        if program_account != ctx.accounts.program_account.key() {
+            return Err(GovernorError::WrongAccount.into());
+        }
+        // Check buffer account
+        if buffer_account != ctx.accounts.buffer_account.key() {
+            return Err(GovernorError::WrongAccount.into());
+        }
+        // Check spill account
+        if buffer_account != ctx.accounts.spill_account.key() {
+            return Err(GovernorError::WrongAccount.into());
+        }
+
         // Transfer the token associated account
         invoke_signed(
             &upgrade(
-                ctx.accounts.program_address.to_account_info().key,
-                ctx.accounts.buffer_address.to_account_info().key,
+                ctx.accounts.program_account.to_account_info().key,
+                ctx.accounts.buffer_account.to_account_info().key,
                 ctx.accounts.config.to_account_info().key,
-                ctx.accounts.spill_address.to_account_info().key
+                ctx.accounts.spill_account.to_account_info().key
             ),
             &[
-                ctx.accounts.program_data_address.to_account_info(),
-                ctx.accounts.program_address.to_account_info(),
-                ctx.accounts.buffer_address.to_account_info(),
-                ctx.accounts.spill_address.to_account_info(),
+                ctx.accounts.program_data_account.to_account_info(),
+                ctx.accounts.program_account.to_account_info(),
+                ctx.accounts.buffer_account.to_account_info(),
+                ctx.accounts.spill_account.to_account_info(),
                 ctx.accounts.rent.to_account_info(),
                 ctx.accounts.clock.to_account_info(),
                 ctx.accounts.config.to_account_info()
             ],
             &[&ctx.accounts.config.seeds()]
         )?;
+
+        // Save batch ID, keccak256 hash and governor message sequence.
+        ctx.accounts.received.batch_id = posted_message.batch_id();
+        ctx.accounts.received.wormhole_message_hash = vaa_hash;
+        ctx.accounts.received.sequence = posted_message.sequence();
+
+        emit!(UpgradeProgramEvent {
+            signer: ctx.accounts.signer.key(),
+            program_account,
+            buffer_account,
+            spill_account
+        });
 
         Ok(())
     }
