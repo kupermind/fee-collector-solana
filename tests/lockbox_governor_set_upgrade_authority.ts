@@ -13,7 +13,7 @@ import fs from "fs";
 // 1. Deploy governor program
 // 2. Deploy liquidity_lockbox (1okwt4nGbpr82kkr6t1767sAenfeZBxUyzJAAaumZRG) from artifacts or use another key-pair
 //    Make sure you are the program authority. Example:
-//      solana program deploy --program-id 1okwt4nGbpr82kkr6t1767sAenfeZBxUyzJAAaumZRG.json artifacts/liquidity_lockbox.so --url localhost
+//      solana program deploy --program-id artifacts/1okwt4nGbpr82kkr6t1767sAenfeZBxUyzJAAaumZRG.json artifacts/liquidity_lockbox.so --url localhost
 //    Check authority:
 //      solana program show 1okwt4nGbpr82kkr6t1767sAenfeZBxUyzJAAaumZRG --url localhost
 // 3. Change the deployed program authority to pdaConfig (CuZVidD5KhTGN2jc931uH4EBAErzYWCUiLJUVA9NtLHw). Example:

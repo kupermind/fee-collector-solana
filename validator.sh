@@ -1,5 +1,5 @@
 #!/bin/bash
-solana-test-validator --bpf-program DWDGo2UkBUFZ3VitBfWRBMvRnHr7E2DSh57NK27xMYaB target/deploy/fee_collector.so \
+solana-test-validator --bpf-program DWDGo2UkBUFZ3VitBfWRBMvRnHr7E2DSh57NK27xMYaB target/deploy/lockbox_governor.so \
 --account Ez3nzG9ofodYCvEmw73XhQ87LWNYVRM2s7diB5tBZPyM fork_accounts/Ez3nzG9ofodYCvEmw73XhQ87LWNYVRM2s7diB5tBZPyM.json \
 --account 7e8LRrfeeSGfS2SSVGJMZQLQKzYhkBp8VKtt34uJMR4t fork_accounts/7e8LRrfeeSGfS2SSVGJMZQLQKzYhkBp8VKtt34uJMR4t.json \
 --account HJzBPrhZyMk3rbrnWxpRXXfPiymNXrWkP77rfo6MBh9e fork_accounts/HJzBPrhZyMk3rbrnWxpRXXfPiymNXrWkP77rfo6MBh9e.json \

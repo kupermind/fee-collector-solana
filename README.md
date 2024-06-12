@@ -1,15 +1,15 @@
-# Fee Collector Solana
-Timelock governed OLAS and SOL Fee Collector on Solana.
+# Lockbox Governor Solana
+Timelock governed OLAS and SOL Fee Collector and Program Manager on Solana.
 
 ## Pre-requisites
-A successful program CPI with Lockbox and Orca Whirlpool programs requires that the following environment is satisfied:
+The programs requires that the following environment is satisfied:
 ```
 anchor --version
-anchor-cli 0.26.0
+anchor-cli 0.29.0
 solana --version
-solana-cli 1.14.29 (src:36af529e; feat:139196142)
+solana-cli 1.18.1 (src:5d824a36; feat:756280933, client:SolanaLabs)
 rustc --version
-rustc 1.62.0 (a8314ef7d 2022-06-27)
+rustc 1.74.1 (a28077b28 2023-12-04)
 ```
 
 Advise the script `setup-env.sh` to correctly install the required environment.
@@ -49,9 +49,12 @@ To run the initial script that would just initialize the lockbox governor progra
 solana airdrop 10000 9fit3w7t6FHATDaZWotpWqN7NpqgL3Lm1hqUop4hAy8h --url localhost && npx ts-node tests/lockbox_governor_init.ts
 ```
 
-To run integration test, make sure to stop and start the `validator.sh` in a separate window. Then run:
+To run integration tests, make sure to stop and start the `validator.sh` in a separate window. Then run:
 ```
-solana airdrop 10000 9fit3w7t6FHATDaZWotpWqN7NpqgL3Lm1hqUop4hAy8h --url localhost && npx ts-node tests/lockbox_governor_transfer.ts
+solana airdrop 10000 9fit3w7t6FHATDaZWotpWqN7NpqgL3Lm1hqUop4hAy8h --url localhost && npx ts-node tests/lockbox_governor_transfer_sol.ts
+solana airdrop 10000 9fit3w7t6FHATDaZWotpWqN7NpqgL3Lm1hqUop4hAy8h --url localhost && npx ts-node tests/lockbox_governor_transfer_all.ts
+solana airdrop 10000 9fit3w7t6FHATDaZWotpWqN7NpqgL3Lm1hqUop4hAy8h --url localhost && npx ts-node tests/lockbox_governor_transfer_token_accounts.ts
+solana airdrop 10000 9fit3w7t6FHATDaZWotpWqN7NpqgL3Lm1hqUop4hAy8h --url localhost && npx ts-node tests/lockbox_governor_set_upgrade_authority.ts
 ```
 
 The deployed program ID must be `DWDGo2UkBUFZ3VitBfWRBMvRnHr7E2DSh57NK27xMYaB` and corresponds to the `declare_id`
