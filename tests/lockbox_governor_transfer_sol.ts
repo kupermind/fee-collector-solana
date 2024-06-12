@@ -47,6 +47,7 @@ async function main() {
 
   // User wallet is the provider payer
   const userWallet = provider.wallet["payer"];
+  console.log("User wallet:", userWallet.publicKey.toBase58());
 
   console.log("timelock", timelock.toBase58());
 
@@ -88,6 +89,9 @@ async function main() {
     // Simulate SOL transfer and the sync of native SOL
     await provider.connection.requestAirdrop(pdaTokenAccountA.address, 100000000000);
     await syncNative(provider.connection, userWallet, pdaTokenAccountA.address);
+
+    // Sleep to wait for airdrops finalization
+    await new Promise(f => setTimeout(f, 2000));
 
     // Get the tokenB ATA of the userWallet address, and if it does not exist, create it
     const tokenOwnerAccountB = await getOrCreateAssociatedTokenAccount(
@@ -152,7 +156,7 @@ async function main() {
     console.log("Received PDA address:", pdaReceived.toBase58());
     console.log("Received PDA bump:", bumpReceived);
 
-    // Receive message
+    // Receive message to transfer SOL funds
     try {
         signature = await program.methods
           .transfer(vaaHashTransfer)
@@ -183,6 +187,24 @@ async function main() {
     });
 
     console.log("Successfully transferred the funds");
+
+
+    // Try to repeat the successful transaction
+    try {
+        signature = await program.methods
+          .transfer(vaaHashTransfer)
+          .accounts(
+            {
+              config: pdaConfig,
+              wormholeProgram: wormhole,
+              posted,
+              received: pdaReceived,
+              sourceAccount: pdaTokenAccountA.address,
+              destinationAccount: tokenOwnerAccountA.address
+            }
+          )
+          .rpc();
+    } catch (error) {}
 }
 
 main();

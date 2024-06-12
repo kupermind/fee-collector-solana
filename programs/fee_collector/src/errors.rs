@@ -36,6 +36,14 @@ pub enum GovernorError {
     InvalidMessage,
 
     #[msg("Wrong token mint")]
-    /// Wrong token mint specified.
-    WrongTokenMint
+    /// Wrong token mint.
+    WrongTokenMint,
+
+    #[msg("Wrong token account")]
+    /// Wrong token account.
+    WrongTokenAccount,
+
+    #[msg("Overflow value")]
+    /// Overflow value.
+    Overflow
 }

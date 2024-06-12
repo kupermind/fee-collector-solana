@@ -4,12 +4,11 @@ use wormhole_io::{Readable, Writeable};
 
 const PAYLOAD_TRANSFER: u8 = 0;
 const PAYLOAD_TRANSFER_ALL: u8 = 1;
-const PAYLOAD_TRANSFER_ACCOUNTS: u8 = 2;
-const PAYLOAD_TRANSFER_TOKEN_ACCOUNTS: u8 = 3;
-const PAYLOAD_CHANGE_UPGRADE_AUTHORITY: u8 = 4;
-const PAYLOAD_UPGRADE_PROGRAM: u8 = 5;
+const PAYLOAD_TRANSFER_TOKEN_ACCOUNTS: u8 = 2;
+const PAYLOAD_CHANGE_UPGRADE_AUTHORITY: u8 = 3;
+const PAYLOAD_UPGRADE_PROGRAM: u8 = 4;
 
-pub const HELLO_MESSAGE_MAX_LENGTH: usize = 512;
+//pub const HELLO_MESSAGE_MAX_LENGTH: usize = 512;
 
 //#[derive(Clone)]
 /// Expected message types for this program. Only valid payloads are:
@@ -51,6 +50,81 @@ impl AnchorDeserialize for TransferMessage {
                 source: <[u8; 32]>::read(reader)?,
                 destination: <[u8; 32]>::read(reader)?,
                 amount: u64::read(reader)?,
+            }),
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Invalid payload ID",
+            )),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct TransferAllMessage {
+    pub source_sol: [u8; 32],
+    pub source_olas: [u8; 32],
+    pub destination_sol: [u8; 32],
+    pub destination_olas: [u8; 32]
+}
+
+impl AnchorSerialize for TransferAllMessage {
+    fn serialize<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
+        PAYLOAD_TRANSFER_ALL.write(writer)?;
+        self.source_sol.write(writer)?;
+        self.source_olas.write(writer)?;
+        self.destination_sol.write(writer)?;
+        self.destination_olas.write(writer)?;
+
+        Ok(())
+    }
+}
+
+impl AnchorDeserialize for TransferAllMessage {
+    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+        let selector = u8::read(reader)?;
+
+        match selector {
+            PAYLOAD_TRANSFER_ALL => Ok(TransferAllMessage {
+                source_sol: <[u8; 32]>::read(reader)?,
+                source_olas: <[u8; 32]>::read(reader)?,
+                destination_sol: <[u8; 32]>::read(reader)?,
+                destination_olas: <[u8; 32]>::read(reader)?
+            }),
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Invalid payload ID",
+            )),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct TransferTokenAccountsMessage {
+    pub source_sol: [u8; 32],
+    pub source_olas: [u8; 32],
+    pub destination: [u8; 32]
+}
+
+impl AnchorSerialize for TransferTokenAccountsMessage {
+    fn serialize<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
+        PAYLOAD_TRANSFER_TOKEN_ACCOUNTS.write(writer)?;
+        self.source_sol.write(writer)?;
+        self.source_olas.write(writer)?;
+        self.destination.write(writer)?;
+
+        Ok(())
+    }
+}
+
+impl AnchorDeserialize for TransferTokenAccountsMessage {
+    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+        let selector = u8::read(reader)?;
+
+        match selector {
+            PAYLOAD_TRANSFER_TOKEN_ACCOUNTS => Ok(TransferTokenAccountsMessage {
+                source_sol: <[u8; 32]>::read(reader)?,
+                source_olas: <[u8; 32]>::read(reader)?,
+                destination: <[u8; 32]>::read(reader)?
             }),
             _ => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,

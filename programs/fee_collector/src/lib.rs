@@ -65,11 +65,11 @@ pub mod lockbox_governor {
         Ok(())
     }
 
-  /// Transfer token funds.
-  pub fn transfer(
-    ctx: Context<TransferLockboxGovernor>,
-    vaa_hash: [u8; 32]
-  ) -> Result<()> {
+    /// Transfer token funds.
+    pub fn transfer(
+        ctx: Context<TransferLockboxGovernor>,
+        vaa_hash: [u8; 32]
+    ) -> Result<()> {
         let posted_message = &ctx.accounts.posted;
 
         msg!(
@@ -92,15 +92,13 @@ pub mod lockbox_governor {
         let destination_account = Pubkey::try_from(*destination).unwrap();
 
         // Check source account
-        require!(
-            source_account == ctx.accounts.source_account.key(),
-            GovernorError::InvalidMessage,
-        );
+        if source_account != ctx.accounts.source_account.key() {
+            return Err(GovernorError::WrongTokenAccount.into());
+        }
         // Check destination account
-        require!(
-            destination_account == ctx.accounts.destination_account.key(),
-            GovernorError::InvalidMessage,
-        );
+        if destination_account != ctx.accounts.destination_account.key() {
+            return Err(GovernorError::WrongTokenAccount.into());
+        }
 
         msg!(
             "Source {:?}",
@@ -123,206 +121,284 @@ pub mod lockbox_governor {
             source_balance
         );
 
-    // Check that the token mint is SOL or OLAS
-    if ctx.accounts.source_account.mint == SOL && ctx.accounts.destination_account.mint == SOL {
-      ctx.accounts.config.total_sol_transferred += amount;
-    } else if ctx.accounts.source_account.mint == OLAS && ctx.accounts.destination_account.mint == OLAS {
-      ctx.accounts.config.total_olas_transferred += amount;
-    } else {
-      return Err(GovernorError::WrongTokenMint.into());
+        // Check that the token mint is SOL or OLAS
+        if ctx.accounts.source_account.mint == SOL && ctx.accounts.destination_account.mint == SOL {
+            ctx.accounts.config.total_sol_transferred += *amount;
+        } else if ctx.accounts.source_account.mint == OLAS && ctx.accounts.destination_account.mint == OLAS {
+            ctx.accounts.config.total_olas_transferred += *amount;
+        } else {
+            return Err(GovernorError::WrongTokenMint.into());
+        }
+
+        // Check the account balance
+        if *amount > ctx.accounts.source_account.amount {
+            return Err(GovernorError::Overflow.into());
+        }
+
+        // TODO: verifications
+
+        // Transfer the amount of SOL
+        token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.source_account.to_account_info(),
+                    to: ctx.accounts.destination_account.to_account_info(),
+                    authority: ctx.accounts.config.to_account_info(),
+                },
+                &[&ctx.accounts.config.seeds()],
+            ),
+            *amount
+        )?;
+
+        // Save batch ID, keccak256 hash and governor message sequence.
+        ctx.accounts.received.batch_id = posted_message.batch_id();
+        ctx.accounts.received.wormhole_message_hash = vaa_hash;
+        ctx.accounts.received.sequence = posted_message.sequence();
+
+        emit!(TransferEvent {
+            signer: ctx.accounts.signer.key(),
+            token: ctx.accounts.source_account.mint,
+            destination: destination_account,
+            amount: *amount
+        });
+
+        Ok(())
     }
 
-        // Save batch ID, keccak256 hash and message payload.
-        let received = &mut ctx.accounts.received;
-        received.batch_id = posted_message.batch_id();
-        received.wormhole_message_hash = vaa_hash;
-        received.sequence = posted_message.sequence();
+    /// Transfer token funds.
+    pub fn transfer_all(
+        ctx: Context<TransferAllLockboxGovernor>,
+        vaa_hash: [u8; 32]
+    ) -> Result<()> {
+        let posted_message = &ctx.accounts.posted;
 
-    // TODO: verifications
+        let TransferAllMessage { source_sol, source_olas, destination_sol, destination_olas } = posted_message.data();
+        let source_account_sol = Pubkey::try_from(*source_sol).unwrap();
+        let source_account_olas = Pubkey::try_from(*source_olas).unwrap();
+        let destination_account_sol = Pubkey::try_from(*destination_sol).unwrap();
+        let destination_account_olas = Pubkey::try_from(*destination_olas).unwrap();
 
-    // Transfer the amount of SOL
-    token::transfer(
-        CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            Transfer {
-                from: ctx.accounts.source_account.to_account_info(),
-                to: ctx.accounts.destination_account.to_account_info(),
-                authority: ctx.accounts.config.to_account_info(),
-            },
+        msg!("Source account SOL {:?}", source_account_sol);
+        msg!("Source account OLAS {:?}", source_account_olas);
+
+        msg!("Destination SOL {:?}", destination_account_sol);
+        msg!("Destination OLAS {:?}", destination_account_olas);
+
+        // Check source accounts
+        if source_account_sol != ctx.accounts.source_account_sol.key() {
+            return Err(GovernorError::WrongTokenAccount.into());
+        }
+        if source_account_olas != ctx.accounts.source_account_olas.key() {
+            return Err(GovernorError::WrongTokenAccount.into());
+        }
+        // Check destination accounts
+        if destination_account_sol != ctx.accounts.destination_account_sol.key() {
+            return Err(GovernorError::WrongTokenAccount.into());
+        }
+        if destination_account_olas != ctx.accounts.destination_account_olas.key() {
+            return Err(GovernorError::WrongTokenAccount.into());
+        }
+
+        // Check that the first token mint is SOL
+        if ctx.accounts.source_account_sol.mint != SOL || ctx.accounts.destination_account_sol.mint != SOL {
+            return Err(GovernorError::WrongTokenMint.into());
+        }
+
+        // Check that the second token mint is OLAS
+        if ctx.accounts.source_account_olas.mint != OLAS || ctx.accounts.destination_account_olas.mint != OLAS {
+            return Err(GovernorError::WrongTokenMint.into());
+        }
+
+        // Get all amounts
+        let amount_sol = ctx.accounts.source_account_sol.amount;
+        let amount_olas = ctx.accounts.source_account_olas.amount;
+        ctx.accounts.config.total_sol_transferred += amount_sol;
+        ctx.accounts.config.total_olas_transferred += amount_olas;
+
+        // Transfer SOL balance
+        if amount_sol > 0 {
+            token::transfer(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    Transfer {
+                        from: ctx.accounts.source_account_sol.to_account_info(),
+                        to: ctx.accounts.destination_account_sol.to_account_info(),
+                        authority: ctx.accounts.config.to_account_info(),
+                    },
+                    &[&ctx.accounts.config.seeds()],
+                ),
+                amount_sol,
+            )?;
+        }
+
+        // Transfer OLAS balance
+        if amount_olas > 0 {
+            token::transfer(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    Transfer {
+                        from: ctx.accounts.source_account_olas.to_account_info(),
+                        to: ctx.accounts.destination_account_olas.to_account_info(),
+                        authority: ctx.accounts.config.to_account_info(),
+                    },
+                    &[&ctx.accounts.config.seeds()],
+                ),
+                amount_olas,
+            )?;
+        }
+
+        // Save batch ID, keccak256 hash and governor message sequence.
+        ctx.accounts.received.batch_id = posted_message.batch_id();
+        ctx.accounts.received.wormhole_message_hash = vaa_hash;
+        ctx.accounts.received.sequence = posted_message.sequence();
+
+        emit!(TransferAllEvent {
+            signer: ctx.accounts.signer.key(),
+            destination_account_sol,
+            destination_account_olas,
+            amount_sol,
+            amount_olas
+        });
+
+        Ok(())
+    }
+
+    /// Transfer token account.
+    pub fn transfer_token_accounts(
+        ctx: Context<TransferTokenAccountsLockboxGovernor>,
+        vaa_hash: [u8; 32]
+    ) -> Result<()> {
+        let posted_message = &ctx.accounts.posted;
+
+        let TransferTokenAccountsMessage { source_sol, source_olas, destination } = posted_message.data();
+        let source_account_sol = Pubkey::try_from(*source_sol).unwrap();
+        let source_account_olas = Pubkey::try_from(*source_olas).unwrap();
+        let destination_account = Pubkey::try_from(*destination).unwrap();
+
+        // Check source accounts
+        if source_account_sol != ctx.accounts.source_account_sol.key() {
+            return Err(GovernorError::WrongTokenAccount.into());
+        }
+        if source_account_olas != ctx.accounts.source_account_olas.key() {
+            return Err(GovernorError::WrongTokenAccount.into());
+        }
+        // Check destination accounts
+        if destination_account != ctx.accounts.destination_account.key() {
+            return Err(GovernorError::WrongTokenAccount.into());
+        }
+
+        // Check that the first token mint is SOL
+        if ctx.accounts.source_account_sol.mint != SOL {
+            return Err(GovernorError::WrongTokenMint.into());
+        }
+
+        // Check that the second token mint is OLAS
+        if ctx.accounts.source_account_olas.mint != OLAS {
+            return Err(GovernorError::WrongTokenMint.into());
+        }
+
+        // Transfer SOL token associated account
+        invoke_signed(
+            &set_authority(
+                ctx.accounts.token_program.key,
+                ctx.accounts.source_account_sol.to_account_info().key,
+                Some(ctx.accounts.destination_account.to_account_info().key),
+                AuthorityType::AccountOwner,
+                ctx.accounts.config.to_account_info().key,
+                &[],
+            )?,
+            &[
+                ctx.accounts.source_account_sol.to_account_info(),
+                ctx.accounts.config.to_account_info(),
+                ctx.accounts.token_program.to_account_info(),
+            ],
             &[&ctx.accounts.config.seeds()],
-        ),
-        *amount
-    )?;
+        )?;
 
-    emit!(TransferEvent {
-        signer: ctx.accounts.signer.key(),
-        token: ctx.accounts.source_account.mint,
-        destination: destination_account,
-        amount: *amount
-    });
-
-    Ok(())
-  }
-
-  /// Transfer token funds.
-  pub fn transfer_all(
-    ctx: Context<TransferAllLockboxGovernor>
-  ) -> Result<()> {
-    // Check that the first token mint is SOL
-    if ctx.accounts.source_account_sol.mint != SOL || ctx.accounts.destination_account_sol.mint != SOL {
-      return Err(GovernorError::WrongTokenMint.into());
-    }
-
-    // Check that the second token mint is OLAS
-    if ctx.accounts.source_account_olas.mint != OLAS || ctx.accounts.destination_account_olas.mint != OLAS {
-      return Err(GovernorError::WrongTokenMint.into());
-    }
-
-    // Get all amounts
-    let amount_sol = ctx.accounts.source_account_sol.amount;
-    let amount_olas = ctx.accounts.source_account_olas.amount;
-    ctx.accounts.config.total_sol_transferred += amount_sol;
-    ctx.accounts.config.total_olas_transferred += amount_olas;
-
-    // TODO optimize with creating context and calling transfer one by one
-    // Transfer the amount of SOL
-    token::transfer(
-        CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            Transfer {
-                from: ctx.accounts.source_account_sol.to_account_info(),
-                to: ctx.accounts.destination_account_sol.to_account_info(),
-                authority: ctx.accounts.config.to_account_info(),
-            },
+        // Transfer OLAS token associated account
+        invoke_signed(
+            &set_authority(
+                ctx.accounts.token_program.key,
+                ctx.accounts.source_account_olas.to_account_info().key,
+                Some(ctx.accounts.destination_account.to_account_info().key),
+                AuthorityType::AccountOwner,
+                ctx.accounts.config.to_account_info().key,
+                &[],
+            )?,
+            &[
+                ctx.accounts.source_account_olas.to_account_info(),
+                ctx.accounts.config.to_account_info(),
+                ctx.accounts.token_program.to_account_info(),
+            ],
             &[&ctx.accounts.config.seeds()],
-        ),
-        amount_sol,
-    )?;
+        )?;
 
-    // Transfer the amount of OLAS
-    token::transfer(
-        CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            Transfer {
-                from: ctx.accounts.source_account_olas.to_account_info(),
-                to: ctx.accounts.destination_account_olas.to_account_info(),
-                authority: ctx.accounts.config.to_account_info(),
-            },
-            &[&ctx.accounts.config.seeds()],
-        ),
-        amount_olas,
-    )?;
+        // Save batch ID, keccak256 hash and governor message sequence.
+        ctx.accounts.received.batch_id = posted_message.batch_id();
+        ctx.accounts.received.wormhole_message_hash = vaa_hash;
+        ctx.accounts.received.sequence = posted_message.sequence();
 
-    emit!(TransferAllEvent {
-        signer: ctx.accounts.signer.key(),
-        amount_sol,
-        amount_olas
-    });
+        emit!(TransferTokenAccountsEvent {
+            signer: ctx.accounts.signer.key(),
+            source_account_sol,
+            source_account_olas,
+            destination_account
+        });
 
-    Ok(())
-  }
-
-  /// Transfer token account.
-  pub fn transfer_token_accounts(
-    ctx: Context<TransferTokenAccountsLockboxGovernor>
-  ) -> Result<()> {
-    // Check that the first token mint is SOL
-    if ctx.accounts.source_account_sol.mint != SOL {
-      return Err(GovernorError::WrongTokenMint.into());
+        Ok(())
     }
 
-    // Check that the second token mint is OLAS
-    if ctx.accounts.source_account_olas.mint != OLAS {
-      return Err(GovernorError::WrongTokenMint.into());
+    /// Change upgrade authority.
+    pub fn change_upgrade_authority(
+        ctx: Context<ChangeUpgradeAuthorityLockboxGovernor>,
+        vaa_hash: [u8; 32]
+    ) -> Result<()> {
+        // Change upgrade authority
+        invoke_signed(
+            &set_upgrade_authority(
+                ctx.accounts.program_to_update_authority.to_account_info().key,
+                ctx.accounts.config.to_account_info().key,
+                Some(ctx.accounts.destination.to_account_info().key)
+            ),
+            &[
+                ctx.accounts.program_data_to_update_authority.to_account_info(),
+                ctx.accounts.config.to_account_info(),
+                ctx.accounts.destination.to_account_info()
+            ],
+            &[&ctx.accounts.config.seeds()]
+        )?;
+
+        Ok(())
     }
 
-    // Transfer SOL token associated account
-    invoke_signed(
-        &set_authority(
-            ctx.accounts.token_program.key,
-            ctx.accounts.source_account_sol.to_account_info().key,
-            Some(ctx.accounts.destination.to_account_info().key),
-            AuthorityType::AccountOwner,
-            ctx.accounts.config.to_account_info().key,
-            &[],
-        )?,
-        &[
-            ctx.accounts.source_account_sol.to_account_info(),
-            ctx.accounts.config.to_account_info(),
-            ctx.accounts.token_program.to_account_info(),
-        ],
-        &[&ctx.accounts.config.seeds()],
-    )?;
+    /// Upgrade the program.
+    pub fn upgrade_program(
+        ctx: Context<UpgradeProgramLockboxGovernor>,
+        vaa_hash: [u8; 32]
+    ) -> Result<()> {
+        // Transfer the token associated account
+        invoke_signed(
+            &upgrade(
+                ctx.accounts.program_address.to_account_info().key,
+                ctx.accounts.buffer_address.to_account_info().key,
+                ctx.accounts.config.to_account_info().key,
+                ctx.accounts.spill_address.to_account_info().key
+            ),
+            &[
+                ctx.accounts.program_data_address.to_account_info(),
+                ctx.accounts.program_address.to_account_info(),
+                ctx.accounts.buffer_address.to_account_info(),
+                ctx.accounts.spill_address.to_account_info(),
+                ctx.accounts.rent.to_account_info(),
+                ctx.accounts.clock.to_account_info(),
+                ctx.accounts.config.to_account_info()
+            ],
+            &[&ctx.accounts.config.seeds()]
+        )?;
 
-    // Transfer OLAS token associated account
-    invoke_signed(
-        &set_authority(
-            ctx.accounts.token_program.key,
-            ctx.accounts.source_account_olas.to_account_info().key,
-            Some(ctx.accounts.destination.to_account_info().key),
-            AuthorityType::AccountOwner,
-            ctx.accounts.config.to_account_info().key,
-            &[],
-        )?,
-        &[
-            ctx.accounts.source_account_olas.to_account_info(),
-            ctx.accounts.config.to_account_info(),
-            ctx.accounts.token_program.to_account_info(),
-        ],
-        &[&ctx.accounts.config.seeds()],
-    )?;
-
-    Ok(())
-  }
-
-  /// Change upgrade authority.
-  pub fn change_upgrade_authority(
-    ctx: Context<ChangeUpgradeAuthorityLockboxGovernor>
-  ) -> Result<()> {
-    // Change upgrade authority
-    invoke_signed(
-        &set_upgrade_authority(
-            ctx.accounts.program_to_update_authority.to_account_info().key,
-            ctx.accounts.config.to_account_info().key,
-            Some(ctx.accounts.destination.to_account_info().key)
-        ),
-        &[
-            ctx.accounts.program_data_to_update_authority.to_account_info(),
-            ctx.accounts.config.to_account_info(),
-            ctx.accounts.destination.to_account_info()
-        ],
-        &[&ctx.accounts.config.seeds()]
-    )?;
-
-    Ok(())
-  }
-
-  /// Upgrade the program.
-  pub fn upgrade_program(
-    ctx: Context<UpgradeProgramLockboxGovernor>
-  ) -> Result<()> {
-    // Transfer the token associated account
-    invoke_signed(
-        &upgrade(
-            ctx.accounts.program_address.to_account_info().key,
-            ctx.accounts.buffer_address.to_account_info().key,
-            ctx.accounts.config.to_account_info().key,
-            ctx.accounts.spill_address.to_account_info().key
-        ),
-        &[
-            ctx.accounts.program_data_address.to_account_info(),
-            ctx.accounts.program_address.to_account_info(),
-            ctx.accounts.buffer_address.to_account_info(),
-            ctx.accounts.spill_address.to_account_info(),
-            ctx.accounts.rent.to_account_info(),
-            ctx.accounts.clock.to_account_info(),
-            ctx.accounts.config.to_account_info()
-        ],
-        &[&ctx.accounts.config.seeds()]
-    )?;
-
-    Ok(())
-  }
+        Ok(())
+    }
 
 //     /// This instruction reads a posted verified Wormhole message and verifies
 //     /// that the payload is of type [HelloWorldMessage::Hello] (payload ID == 1). HelloWorldMessage
