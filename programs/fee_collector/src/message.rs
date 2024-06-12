@@ -26,7 +26,6 @@ pub const HELLO_MESSAGE_MAX_LENGTH: usize = 512;
 
 #[derive(Clone)]
 pub struct TransferMessage {
-    pub token: [u8; 32],
     pub source: [u8; 32],
     pub destination: [u8; 32],
     pub amount: u64
@@ -35,7 +34,6 @@ pub struct TransferMessage {
 impl AnchorSerialize for TransferMessage {
     fn serialize<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
         PAYLOAD_TRANSFER.write(writer)?;
-        self.token.write(writer)?;
         self.source.write(writer)?;
         self.destination.write(writer)?;
         self.amount.write(writer)?;
@@ -50,7 +48,6 @@ impl AnchorDeserialize for TransferMessage {
 
         match selector {
             PAYLOAD_TRANSFER => Ok(TransferMessage {
-                token: <[u8; 32]>::read(reader)?,
                 source: <[u8; 32]>::read(reader)?,
                 destination: <[u8; 32]>::read(reader)?,
                 amount: u64::read(reader)?,

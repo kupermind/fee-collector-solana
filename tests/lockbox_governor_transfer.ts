@@ -23,11 +23,11 @@ async function main() {
   const program = new Program(idl as anchor.Idl, PROGRAM_ID, anchor.getProvider());
 
   const chainId = 10002;
-  const sequence = 6;
+  const sequence = 7;
   const sol = new anchor.web3.PublicKey("So11111111111111111111111111111111111111112");
   const olas = new anchor.web3.PublicKey("Ez3nzG9ofodYCvEmw73XhQ87LWNYVRM2s7diB5tBZPyM");
   const wormhole = new anchor.web3.PublicKey("3u8hJUVTA4jH1wYAyUur7FFZVQ8H635K3tSHHF4ssjQ5");
-  const posted = new anchor.web3.PublicKey("BKcJAkiGjFiSwRU5RDTLHi1MnRpq2pCju54pmf9J4px4");
+  const posted = new anchor.web3.PublicKey("AdKqXRW51SyZgepKMs2x77kNYMv4CQfsjD7vResES9EQ");
 
   // This corresponds to Sepolia timelock address 000000000000000000000000471b3f60f08c50dd0ecba1bcd113b66fcc02b63d or 0x471b3f60f08c50dd0ecba1bcd113b66fcc02b63d
   const timelockBuffer = Buffer.from([
@@ -39,10 +39,10 @@ async function main() {
   const timelock = new anchor.web3.PublicKey(timelockBuffer);
 
   const vaaHashTransfer = Buffer.from([
-     64, 161, 162, 200,  20, 254,  13,  99,
-     66, 202, 163,  58, 255,  11, 192, 195,
-      9, 170,  28, 151,  86, 245,  81,   4,
-    157,   5,  66,  54,  19, 200, 115,  16
+    229,  55, 161, 184, 116, 103, 140,  23,
+    219, 127, 125, 192,   9, 145, 174, 214,
+    251,  24,  99, 144,  86,  16,  61,  17,
+     26, 115,  37,  73, 254,  42, 223, 238
   ]);
 
   // User wallet is the provider payer

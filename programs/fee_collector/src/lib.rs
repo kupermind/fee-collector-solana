@@ -87,16 +87,10 @@ pub mod lockbox_governor {
             ctx.accounts.posted.sequence()
         );
 
-        let TransferMessage { token, source, destination, amount } = posted_message.data();
-        let token_account = Pubkey::try_from(*token).unwrap();
+        let TransferMessage { source, destination, amount } = posted_message.data();
         let source_account = Pubkey::try_from(*source).unwrap();
         let destination_account = Pubkey::try_from(*destination).unwrap();
 
-        // Check token mint
-        require!(
-            token_account == ctx.accounts.destination_account.mint,
-            GovernorError::InvalidMessage,
-        );
         // Check source account
         require!(
             source_account == ctx.accounts.source_account.key(),
@@ -106,11 +100,6 @@ pub mod lockbox_governor {
         require!(
             destination_account == ctx.accounts.destination_account.key(),
             GovernorError::InvalidMessage,
-        );
-
-        msg!(
-            "Token mint {:?}",
-            token_account
         );
 
         msg!(
