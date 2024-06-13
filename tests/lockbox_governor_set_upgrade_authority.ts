@@ -10,7 +10,7 @@ import fs from "fs";
 
 // NOTE!!!! Make sure you run lockbox_governor_init.ts script first to initialize the governor program
 // NOTE!!!! Run this script only after all the following steps are executed strictly in order:
-// 1. Deploy governor program
+// 1. Deploy governor program by running the lockbox_governor_init.ts script (README)
 // 2. Deploy liquidity_lockbox (1okwt4nGbpr82kkr6t1767sAenfeZBxUyzJAAaumZRG) from artifacts or use another key-pair
 //    Make sure you are the program authority. Example:
 //      solana program deploy --program-id artifacts/1okwt4nGbpr82kkr6t1767sAenfeZBxUyzJAAaumZRG.json artifacts/liquidity_lockbox.so --url localhost

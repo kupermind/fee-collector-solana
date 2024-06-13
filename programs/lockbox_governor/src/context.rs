@@ -32,7 +32,7 @@ pub struct InitializeLockboxGovernor<'info> {
         space = Config::LEN
     )]
     /// Config account, which saves program data useful for other instructions.
-    pub config: Account<'info, Config>,
+    pub config: Box<Account<'info, Config>>,
 
     #[account(address = system_program::ID)]
     pub system_program: Program<'info, System>,
@@ -50,14 +50,14 @@ pub struct TransferLockboxGovernor<'info> {
         seeds = [Config::SEED_PREFIX],
         bump,
         constraint = config.verify(posted.emitter_address()) @ GovernorError::InvalidForeignEmitter,
-        constraint = posted.emitter_chain() == config.chain
+        constraint = posted.emitter_chain() == config.chain @ GovernorError::InvalidForeignChain
     )]
     /// Config account. Wormhole PDAs specified in the config are checked
     /// against the Wormhole accounts in this context. Read-only.
-    pub config: Account<'info, Config>,
+    pub config: Box<Account<'info, Config>>,
 
     // Wormhole program.
-    /// CHECK: Wormhole program account
+    /// CHECK: Wormhole program account. Required for posted account check. Read-only.
     pub wormhole_program: UncheckedAccount<'info>,
 
     #[account(
@@ -70,7 +70,7 @@ pub struct TransferLockboxGovernor<'info> {
     )]
     /// Verified Wormhole message account. The Wormhole program verified
     /// signatures and posted the account data here. Read-only.
-    pub posted: Account<'info, wormhole::PostedVaa<TransferMessage>>,
+    pub posted: Box<Account<'info, wormhole::PostedVaa<TransferMessage>>>,
 
     #[account(
         init,
@@ -87,12 +87,18 @@ pub struct TransferLockboxGovernor<'info> {
     /// deserialize the Wormhole message's payload and save it to this account.
     /// This account cannot be overwritten, and will prevent Wormhole message
     /// replay with the same sequence.
-    pub received: Account<'info, Received>,
+    pub received: Box<Account<'info, Received>>,
 
-    #[account(mut)]
+    #[account(mut,
+        constraint = source_account.owner == config.key() @ GovernorError::WrongAccountOwner
+    )]
+    // Source account must be owned by the Config account.
     pub source_account: Box<Account<'info, TokenAccount>>,
 
-    #[account(mut)]
+    #[account(mut,
+        constraint = source_account.mint == destination_account.mint @ GovernorError::WrongTokenMint
+    )]
+    // Source and destination token mint addresses must match.
     pub destination_account: Box<Account<'info, TokenAccount>>,
 
     #[account(address = token::ID)]
@@ -112,14 +118,14 @@ pub struct TransferAllLockboxGovernor<'info> {
         seeds = [Config::SEED_PREFIX],
         bump,
         constraint = config.verify(posted.emitter_address()) @ GovernorError::InvalidForeignEmitter,
-        constraint = posted.emitter_chain() == config.chain
+        constraint = posted.emitter_chain() == config.chain @ GovernorError::InvalidForeignChain
     )]
     /// Config account. Wormhole PDAs specified in the config are checked
     /// against the Wormhole accounts in this context. Read-only.
-    pub config: Account<'info, Config>,
+    pub config: Box<Account<'info, Config>>,
 
     // Wormhole program.
-    /// CHECK: Wormhole program account
+    /// CHECK: Wormhole program account. Required for posted account check. Read-only.
     pub wormhole_program: UncheckedAccount<'info>,
 
     #[account(
@@ -132,7 +138,7 @@ pub struct TransferAllLockboxGovernor<'info> {
     )]
     /// Verified Wormhole message account. The Wormhole program verified
     /// signatures and posted the account data here. Read-only.
-    pub posted: Account<'info, wormhole::PostedVaa<TransferAllMessage>>,
+    pub posted: Box<Account<'info, wormhole::PostedVaa<TransferAllMessage>>>,
 
     #[account(
         init,
@@ -149,18 +155,32 @@ pub struct TransferAllLockboxGovernor<'info> {
     /// deserialize the Wormhole message's payload and save it to this account.
     /// This account cannot be overwritten, and will prevent Wormhole message
     /// replay with the same sequence.
-    pub received: Account<'info, Received>,
+    pub received: Box<Account<'info, Received>>,
 
-    #[account(mut)]
+    #[account(mut,
+        constraint = source_account_sol.owner == config.key() @ GovernorError::WrongAccountOwner
+    )]
+    // Source SOL account must be owned by the Config account.
     pub source_account_sol: Box<Account<'info, TokenAccount>>,
 
-    #[account(mut)]
+    #[account(mut,
+        constraint = source_account_olas.owner == config.key() @ GovernorError::WrongAccountOwner,
+        constraint = source_account_sol.mint != source_account_olas.mint @ GovernorError::WrongTokenMint
+    )]
+    // Source OLAS account must be owned by the Config account.
+    // Source SOL and OLAS accounts must have different mints.
     pub source_account_olas: Box<Account<'info, TokenAccount>>,
 
-    #[account(mut)]
+    #[account(mut,
+        constraint = source_account_sol.mint == destination_account_sol.mint @ GovernorError::WrongTokenMint
+    )]
+    // Source and destination SOL accounts must have the same token mint.
     pub destination_account_sol: Box<Account<'info, TokenAccount>>,
 
-    #[account(mut)]
+    #[account(mut,
+        constraint = source_account_olas.mint == destination_account_olas.mint @ GovernorError::WrongTokenMint
+    )]
+    // Source and destination OLAS accounts must have the same token mint.
     pub destination_account_olas: Box<Account<'info, TokenAccount>>,
 
     #[account(address = token::ID)]
@@ -180,14 +200,14 @@ pub struct TransferTokenAccountsLockboxGovernor<'info> {
         seeds = [Config::SEED_PREFIX],
         bump,
         constraint = config.verify(posted.emitter_address()) @ GovernorError::InvalidForeignEmitter,
-        constraint = posted.emitter_chain() == config.chain
+        constraint = posted.emitter_chain() == config.chain @ GovernorError::InvalidForeignChain
     )]
     /// Config account. Wormhole PDAs specified in the config are checked
     /// against the Wormhole accounts in this context. Read-only.
-    pub config: Account<'info, Config>,
+    pub config: Box<Account<'info, Config>>,
 
     // Wormhole program.
-    /// CHECK: Wormhole program account
+    /// CHECK: Wormhole program account. Required for posted account check. Read-only.
     pub wormhole_program: UncheckedAccount<'info>,
 
     #[account(
@@ -200,7 +220,7 @@ pub struct TransferTokenAccountsLockboxGovernor<'info> {
     )]
     /// Verified Wormhole message account. The Wormhole program verified
     /// signatures and posted the account data here. Read-only.
-    pub posted: Account<'info, wormhole::PostedVaa<TransferTokenAccountsMessage>>,
+    pub posted: Box<Account<'info, wormhole::PostedVaa<TransferTokenAccountsMessage>>>,
 
     #[account(
         init,
@@ -217,15 +237,21 @@ pub struct TransferTokenAccountsLockboxGovernor<'info> {
     /// deserialize the Wormhole message's payload and save it to this account.
     /// This account cannot be overwritten, and will prevent Wormhole message
     /// replay with the same sequence.
-    pub received: Account<'info, Received>,
+    pub received: Box<Account<'info, Received>>,
 
-    #[account(mut)]
+    #[account(mut,
+        constraint = source_account_sol.owner == config.key() @ GovernorError::WrongAccountOwner
+    )]
+    // Source SOL account must be owned by the Config account.
     pub source_account_sol: Box<Account<'info, TokenAccount>>,
 
-    #[account(mut)]
+    #[account(mut,
+        constraint = source_account_olas.owner == config.key() @ GovernorError::WrongAccountOwner
+    )]
+    // Source OLAS account must be owned by the Config account.
     pub source_account_olas: Box<Account<'info, TokenAccount>>,
 
-    /// CHECK: Check later
+    /// CHECK: This is any account provided by the governor.
     #[account(mut)]
     pub destination_account: UncheckedAccount<'info>,
 
@@ -246,14 +272,14 @@ pub struct SetUpgradeAuthorityLockboxGovernor<'info> {
         seeds = [Config::SEED_PREFIX],
         bump,
         constraint = config.verify(posted.emitter_address()) @ GovernorError::InvalidForeignEmitter,
-        constraint = posted.emitter_chain() == config.chain
+        constraint = posted.emitter_chain() == config.chain @ GovernorError::InvalidForeignChain
     )]
     /// Config account. Wormhole PDAs specified in the config are checked
     /// against the Wormhole accounts in this context. Read-only.
-    pub config: Account<'info, Config>,
+    pub config: Box<Account<'info, Config>>,
 
     // Wormhole program.
-    /// CHECK: Wormhole program account
+    /// CHECK: Wormhole program account. Required for posted account check. Read-only.
     pub wormhole_program: UncheckedAccount<'info>,
 
     #[account(
@@ -266,7 +292,7 @@ pub struct SetUpgradeAuthorityLockboxGovernor<'info> {
     )]
     /// Verified Wormhole message account. The Wormhole program verified
     /// signatures and posted the account data here. Read-only.
-    pub posted: Account<'info, wormhole::PostedVaa<SetUpgradeAuthorityMessage>>,
+    pub posted: Box<Account<'info, wormhole::PostedVaa<SetUpgradeAuthorityMessage>>>,
 
     #[account(
         init,
@@ -283,21 +309,25 @@ pub struct SetUpgradeAuthorityLockboxGovernor<'info> {
     /// deserialize the Wormhole message's payload and save it to this account.
     /// This account cannot be overwritten, and will prevent Wormhole message
     /// replay with the same sequence.
-    pub received: Account<'info, Received>,
+    pub received: Box<Account<'info, Received>>,
 
-    /// CHECK: Check later
-    #[account(mut)]
+    /// CHECK: Any program where the Config account is the upgrade authority.
+    #[account(mut,
+        constraint = program_account.executable == true,
+    )]
     pub program_account: UncheckedAccount<'info>,
 
-    /// CHECK: Check later
-    #[account(mut)]
-    pub program_data_account: UncheckedAccount<'info>,
+    #[account(mut,
+        constraint = program_data_account.upgrade_authority_address == Some(config.key()) @ GovernorError::WrongUpgradeAuthority
+    )]
+    // Program data upgrade authority must be the Config account.
+    pub program_data_account: Box<Account<'info, ProgramData>>,
 
-    /// CHECK: Check later
+    /// CHECK: This is any account provided by the governor.
     #[account(mut)]
     pub upgrade_authority_account: UncheckedAccount<'info>,
 
-    /// CHECK: Check later
+    /// CHECK: BPF Loader Upgraedable account.
     #[account(address = bpf_loader_upgradeable::ID)]
     pub bpf_loader_upgradeable: UncheckedAccount<'info>,
 
@@ -315,14 +345,14 @@ pub struct UpgradeProgramLockboxGovernor<'info> {
         seeds = [Config::SEED_PREFIX],
         bump,
         constraint = config.verify(posted.emitter_address()) @ GovernorError::InvalidForeignEmitter,
-        constraint = posted.emitter_chain() == config.chain
+        constraint = posted.emitter_chain() == config.chain @ GovernorError::InvalidForeignChain
     )]
     /// Config account. Wormhole PDAs specified in the config are checked
     /// against the Wormhole accounts in this context. Read-only.
-    pub config: Account<'info, Config>,
+    pub config: Box<Account<'info, Config>>,
 
     // Wormhole program.
-    /// CHECK: Wormhole program account
+    /// CHECK: Wormhole program account. Required for posted account check. Read-only.
     pub wormhole_program: UncheckedAccount<'info>,
 
     #[account(
@@ -335,7 +365,7 @@ pub struct UpgradeProgramLockboxGovernor<'info> {
     )]
     /// Verified Wormhole message account. The Wormhole program verified
     /// signatures and posted the account data here. Read-only.
-    pub posted: Account<'info, wormhole::PostedVaa<UpgradeProgramMessage>>,
+    pub posted: Box<Account<'info, wormhole::PostedVaa<UpgradeProgramMessage>>>,
 
     #[account(
         init,
@@ -352,24 +382,29 @@ pub struct UpgradeProgramLockboxGovernor<'info> {
     /// deserialize the Wormhole message's payload and save it to this account.
     /// This account cannot be overwritten, and will prevent Wormhole message
     /// replay with the same sequence.
-    pub received: Account<'info, Received>,
+    pub received: Box<Account<'info, Received>>,
 
-    /// CHECK: Check later
-    #[account(mut)]
+    /// CHECK: Any program where the Config account is the upgrade authority.
+    #[account(mut,
+        constraint = program_account.executable == true,
+    )]
     pub program_account: UncheckedAccount<'info>,
 
-    /// CHECK: Check later
-    #[account(mut)]
-    pub program_data_account: UncheckedAccount<'info>,
+    #[account(mut,
+        constraint = program_data_account.upgrade_authority_address == Some(config.key()) @ GovernorError::WrongUpgradeAuthority
+    )]
+    // Program data upgrade authority must be the Config account.
+    pub program_data_account: Box<Account<'info, ProgramData>>,
 
-    /// CHECK: Check later
+    /// CHECK: Buffer account to deploy a new program from. The Config account must be the upgrade authority.
     #[account(mut)]
     pub buffer_account: UncheckedAccount<'info>,
 
+    /// CHECK: This can be any account specified by the governor.
     #[account(mut)]
-    pub spill_account: Box<Account<'info, TokenAccount>>,
+    pub spill_account: UncheckedAccount<'info>,
 
-    /// CHECK: Check later
+    /// CHECK: BPF Loader Upgradeable account.
     #[account(address = bpf_loader_upgradeable::ID)]
     pub bpf_loader_upgradeable: UncheckedAccount<'info>,
 

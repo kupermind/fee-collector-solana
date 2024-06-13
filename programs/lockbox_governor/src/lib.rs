@@ -33,7 +33,12 @@ pub mod lockbox_governor {
     // OLAS address
     const OLAS: Pubkey = pubkey!("Ez3nzG9ofodYCvEmw73XhQ87LWNYVRM2s7diB5tBZPyM");
 
-    /// Initializes a Lockbox account that stores state data.
+    /// Initializes a Lockbox Governor account, aka Config, that stores state data.
+    ///
+    /// # Arguments
+    ///
+    /// * `chain` - Emitter chain ID.
+    /// * `timelock` - Emitter Timelock address.
     pub fn initialize(
     ctx: Context<InitializeLockboxGovernor>,
       chain: u16,
@@ -65,27 +70,21 @@ pub mod lockbox_governor {
         Ok(())
     }
 
-    /// Transfer token funds.
+    /// Transfers specified token amount to a governor specified ATA.
+    /// This instruction reads a posted verified Wormhole message and verifies
+    /// that the payload is of type TransferMessage (PAYLOAD_TRANSFER).
+    /// The data is stored in a [Received] account.
+    ///
+    /// See TransferMessage struct for deserialization implementation.
+    ///
+    /// # Arguments
+    ///
+    /// * `vaa_hash` - Keccak256 hash of verified Wormhole message.
     pub fn transfer(
         ctx: Context<TransferLockboxGovernor>,
         vaa_hash: [u8; 32]
     ) -> Result<()> {
         let posted_message = &ctx.accounts.posted;
-
-        msg!(
-            "Foreign emitter {:?}",
-            ctx.accounts.posted.emitter_address()
-        );
-
-        msg!(
-            "Emitter chain {:?}",
-            ctx.accounts.posted.emitter_chain()
-        );
-
-        msg!(
-            "Sequence {:?}",
-            ctx.accounts.posted.sequence()
-        );
 
         let TransferMessage { source, destination, amount } = posted_message.data();
         let source_account = Pubkey::try_from(*source).unwrap();
@@ -100,26 +99,9 @@ pub mod lockbox_governor {
             return Err(GovernorError::WrongAccount.into());
         }
 
-        msg!(
-            "Source {:?}",
-            source_account
-        );
-
-        msg!(
-            "Destination {:?}",
-            destination_account
-        );
-
-        msg!(
-            "Amount {:?}",
-            *amount
-        );
-
-        let source_balance = ctx.accounts.source_account.amount;
-        msg!(
-            "Source balance {:?}",
-            source_balance
-        );
+        msg!("Source {:?}", source_account);
+        msg!("Destination {:?}", destination_account);
+        msg!("Amount {:?}", *amount);
 
         // Check that the token mint is SOL or OLAS
         if ctx.accounts.source_account.mint == SOL && ctx.accounts.destination_account.mint == SOL {
@@ -166,7 +148,16 @@ pub mod lockbox_governor {
         Ok(())
     }
 
-    /// Transfer token funds.
+    /// Transfers all token balances to governor specified ATAs.
+    /// This instruction reads a posted verified Wormhole message and verifies
+    /// that the payload is of type TransferAllMessage (PAYLOAD_TRANSFER_ALL).
+    /// The data is stored in a [Received] account.
+    ///
+    /// See TransferAllMessage struct for deserialization implementation.
+    ///
+    /// # Arguments
+    ///
+    /// * `vaa_hash` - Keccak256 hash of verified Wormhole message.
     pub fn transfer_all(
         ctx: Context<TransferAllLockboxGovernor>,
         vaa_hash: [u8; 32]
@@ -181,9 +172,8 @@ pub mod lockbox_governor {
 
         msg!("Source account SOL {:?}", source_account_sol);
         msg!("Source account OLAS {:?}", source_account_olas);
-
-        msg!("Destination SOL {:?}", destination_account_sol);
-        msg!("Destination OLAS {:?}", destination_account_olas);
+        msg!("Destination account SOL {:?}", destination_account_sol);
+        msg!("Destination account OLAS {:?}", destination_account_olas);
 
         // Check source accounts
         if source_account_sol != ctx.accounts.source_account_sol.key() {
@@ -264,7 +254,16 @@ pub mod lockbox_governor {
         Ok(())
     }
 
-    /// Transfer token accounts.
+    /// Transfers SOL and OLAS ATAs to a governor specified authority.
+    /// This instruction reads a posted verified Wormhole message and verifies
+    /// that the payload is of type TransferTokenAccountsMessage (PAYLOAD_TRANSFER_TOKEN_ACCOUNTS).
+    /// The data is stored in a [Received] account.
+    ///
+    /// See TransferTokenAccountsMessage struct for deserialization implementation.
+    ///
+    /// # Arguments
+    ///
+    /// * `vaa_hash` - Keccak256 hash of verified Wormhole message.
     pub fn transfer_token_accounts(
         ctx: Context<TransferTokenAccountsLockboxGovernor>,
         vaa_hash: [u8; 32]
@@ -275,6 +274,10 @@ pub mod lockbox_governor {
         let source_account_sol = Pubkey::try_from(*source_sol).unwrap();
         let source_account_olas = Pubkey::try_from(*source_olas).unwrap();
         let destination_account = Pubkey::try_from(*destination).unwrap();
+
+        msg!("Source account SOL {:?}", source_account_sol);
+        msg!("Source account OLAS {:?}", source_account_olas);
+        msg!("Destination account {:?}", destination_account);
 
         // Check source accounts
         if source_account_sol != ctx.accounts.source_account_sol.key() {
@@ -349,7 +352,16 @@ pub mod lockbox_governor {
         Ok(())
     }
 
-    /// Set program upgrade authority.
+    /// Sets program upgrade authority provided by the governor.
+    /// This instruction reads a posted verified Wormhole message and verifies
+    /// that the payload is of type SetUpgradeAuthorityMessage (PAYLOAD_SET_UPGRADE_AUTHORITY).
+    /// The data is stored in a [Received] account.
+    ///
+    /// See SetUpgradeAuthorityMessage struct for deserialization implementation.
+    ///
+    /// # Arguments
+    ///
+    /// * `vaa_hash` - Keccak256 hash of verified Wormhole message.
     pub fn set_program_upgrade_authority(
         ctx: Context<SetUpgradeAuthorityLockboxGovernor>,
         vaa_hash: [u8; 32]
@@ -401,7 +413,16 @@ pub mod lockbox_governor {
         Ok(())
     }
 
-    /// Upgrade the program.
+    /// Upgrades the program via the governor dictated buffer account.
+    /// This instruction reads a posted verified Wormhole message and verifies
+    /// that the payload is of type UpgradeProgramMessage (PAYLOAD_UPGRADE_PROGRAM).
+    /// The data is stored in a [Received] account.
+    ///
+    /// See UpgradeProgramMessage struct for deserialization implementation.
+    ///
+    /// # Arguments
+    ///
+    /// * `vaa_hash` - Keccak256 hash of verified Wormhole message.
     pub fn upgrade_program(
         ctx: Context<UpgradeProgramLockboxGovernor>,
         vaa_hash: [u8; 32]
@@ -426,6 +447,10 @@ pub mod lockbox_governor {
         if spill_account != ctx.accounts.spill_account.key() {
             return Err(GovernorError::WrongAccount.into());
         }
+
+        msg!("Program account {:?}", program_account);
+        msg!("Buffer account {:?}", buffer_account);
+        msg!("Spill account {:?}", spill_account);
 
         // Transfer the token associated account
         invoke_signed(

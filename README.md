@@ -1,5 +1,5 @@
 # Lockbox Governor Solana
-Timelock governed OLAS and SOL Fee Collector and Program Manager on Solana.
+Timelock governed OLAS and SOL accounts Fee Collector and Program Manager on Solana.
 
 ## Pre-requisites
 The programs requires that the following environment is satisfied:
@@ -58,10 +58,17 @@ solana airdrop 10000 9fit3w7t6FHATDaZWotpWqN7NpqgL3Lm1hqUop4hAy8h --url localhos
 solana airdrop 10000 9fit3w7t6FHATDaZWotpWqN7NpqgL3Lm1hqUop4hAy8h --url localhost && npx ts-node tests/lockbox_governor_upgrade_program.ts
 ```
 
+Note that last two tests have to be executed semi-manually, read instructions in each of the test.
+
 The deployed program ID must be `DWDGo2UkBUFZ3VitBfWRBMvRnHr7E2DSh57NK27xMYaB` and corresponds to the `declare_id`
-in the `programs/fee_collector/src/lib.rs` and `Anchor.toml` file.
+in the `programs/lockbox_governor/src/lib.rs` and `Anchor.toml` file.
 
 For debugging a program address, after the launch of local validator, run:
 ```
 solana logs -v --url localhost DWDGo2UkBUFZ3VitBfWRBMvRnHr7E2DSh57NK27xMYaB
 ```
+
+## Acknowledgements
+The contracts were based on and inspired by the following sources:
+- [Wormhole Docs](https://docs.wormhole.com/);
+- [Wormhole Foundation](https://github.com/wormhole-foundation/wormhole-scaffolding).
