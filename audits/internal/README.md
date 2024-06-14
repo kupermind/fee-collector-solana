@@ -81,7 +81,6 @@ https://rustsec.org/advisories/RUSTSEC-2022-0093 - out of scope
 ##### Sec3 x-ray scanner
 
 ### Problems found by manual analysis 14.06.24
-
 List of attack vectors <br>
 https://www.sec3.dev/blog/how-to-audit-solana-smart-contracts-part-1-a-systematic-approach <br>
 https://medium.com/@zokyo.io/what-hackers-look-for-in-a-solana-smart-contract-17ec02b69fb6 <br>
@@ -92,8 +91,8 @@ N/A
 ```rust
 pub config: Box<Account<'info, Config>>
 pub posted: Box<Account<'info, wormhole::PostedVaa<TransferMessage>>>
-pub program_account: UncheckedAccount<'info> (in lir.rs) (to discussed)
-pub buffer_account: UncheckedAccount<'info> (in lir.rs) (to discussed)
+pub program_account: UncheckedAccount<'info> (to discussion)
+pub buffer_account: UncheckedAccount<'info> (to discussion)
 
 program_account vs program_data_account
 https://github.com/solana-labs/solana/blob/master/sdk/program/src/bpf_loader_upgradeable.rs#L29
