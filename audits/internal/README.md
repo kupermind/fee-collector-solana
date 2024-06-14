@@ -1,4 +1,4 @@
-# Internal audit of lockbox-solana
+# Internal audit of lockbox-governor-solana
 The review has been performed based on the contract code in the following repository:<br>
 `https://github.com/valory-xyz/lockbox-governor-solana` <br>
 commit: `7a1381a0885a0fad49be24225d6a483c54701a76` or `v0.1.0-pre-internal-audit`<br> 
