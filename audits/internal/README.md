@@ -77,7 +77,21 @@ Notes: <br>
 https://rustsec.org/advisories/RUSTSEC-2022-0093 - out of scope
 
 ### Problems found by manual analysis 14.06.24
-List of attack vectors <br>
+#### Specific bridge repeat attack
+```
+It is not clear at the code level how it is protected from re-use of the same posted/vaa.
+
+Exists as example:
+ctx.accounts.received.batch_id = posted_message.batch_id();
+ctx.accounts.received.wormhole_message_hash = vaa_hash;
+ctx.accounts.received.sequence = posted_message.sequence();
+But they never participate in any checking. (?)
+
+Expected logical result: a message coming from L1 can be processed on Solana only once for every each unique message.
+```
+To discussion. <br>
+
+#### List of common attack vectors
 https://www.sec3.dev/blog/how-to-audit-solana-smart-contracts-part-1-a-systematic-approach <br>
 https://medium.com/@zokyo.io/what-hackers-look-for-in-a-solana-smart-contract-17ec02b69fb6 <br>
 1. Missing signer checks (e.g., by checking AccountInfo::is_signer ) <br>
