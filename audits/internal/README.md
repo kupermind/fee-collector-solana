@@ -76,9 +76,6 @@ All automatic warnings are listed in the following file, concerns of which we ad
 Notes: <br>
 https://rustsec.org/advisories/RUSTSEC-2022-0093 - out of scope
 
-### Problems found by analysis
-##### Sec3 x-ray scanner
-
 ### Problems found by manual analysis 14.06.24
 List of attack vectors <br>
 https://www.sec3.dev/blog/how-to-audit-solana-smart-contracts-part-1-a-systematic-approach <br>
