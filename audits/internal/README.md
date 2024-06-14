@@ -40,7 +40,6 @@ ANCHORVER="0.29.0"
 ## Security issues.
 ### Problems found instrumentally
 Several checks are obtained automatically. They are commented. Some issues found need to be fixed. <br>
-```
 List of rust tools:
 ##### cargo tree
 ```
