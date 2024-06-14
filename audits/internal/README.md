@@ -88,6 +88,10 @@ ctx.accounts.received.sequence = posted_message.sequence();
 But they never participate in any checking. (?)
 
 Expected logical result: a message coming from L1 can be processed on Solana only once for every each unique message.
+I.e. 
+L1 -> msg1(transfer,source,destination,amount) -> Solana
+on Solana -> run msg1(transfer,source,destination,amount) - OK
+on Sonala -> run msg1(transfer,source,destination,amount) - expected Fail
 ```
 To discussion. <br>
 
