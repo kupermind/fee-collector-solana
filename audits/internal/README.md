@@ -107,29 +107,6 @@ pub config: Box<Account<'info, Config>>
 pub posted: Box<Account<'info, wormhole::PostedVaa<TransferMessage>>>
 pub program_account: UncheckedAccount<'info> (to discussion)
 pub buffer_account: UncheckedAccount<'info> (to discussion)
-
-program_account vs program_data_account
-https://github.com/solana-labs/solana/blob/master/sdk/program/src/bpf_loader_upgradeable.rs#L29
-Buffer {
-        /// Authority address
-        authority_address: Option<Pubkey>,
-        // The raw program data follows this serialized structure in the
-        // account's data.
-    },
-    /// An Program account.
-    Program {
-        /// Address of the ProgramData account.
-        programdata_address: Pubkey,
-    },
-    // A ProgramData account.
-    ProgramData {
-        /// Slot that the program was last modified.
-        slot: u64,
-        /// Address of the Program's upgrade authority.
-        upgrade_authority_address: Option<Pubkey>,
-        // The raw program data follows this serialized structure in the
-        // account's data.
-    }
 ```
 3. Missing rent exemption checks <br>
 in `upgrade_program`? <br>
@@ -151,6 +128,29 @@ pub fn upgrade_program() - OK
 To discussion. <br>
 
 5. Solana account confusions: the program fails to ensure that the account data has the type it expects to have. <br>
+```rust
+program_account vs program_data_account
+https://github.com/solana-labs/solana/blob/master/sdk/program/src/bpf_loader_upgradeable.rs#L29
+Buffer {
+        /// Authority address
+        authority_address: Option<Pubkey>,
+        // The raw program data follows this serialized structure in the
+        // account's data.
+    },
+    /// An Program account.
+    Program {
+        /// Address of the ProgramData account.
+        programdata_address: Pubkey,
+    },
+    // A ProgramData account.
+    ProgramData {
+        /// Slot that the program was last modified.
+        slot: u64,
+        /// Address of the Program's upgrade authority.
+        upgrade_authority_address: Option<Pubkey>,
+        // The raw program data follows this serialized structure in the
+        // account's data.
+```
 
 6. Re-initiation with cross-instance confusion <br>
 Passed. Example: https://github.com/coral-xyz/sealevel-attacks/blob/master/programs/4-initialization/recommended/src/lib.rs
@@ -164,6 +164,14 @@ To discussion. <br>
 
 8. Numerical precision errors: numeric calculations on floating point can cause precision errors and those errors can accumulate. <br>
 N/A
+
+9. Common issue <br>
+```
+checking source_account != destination_account
+from: ctx.accounts.source_account.to_account_info(),
+to: ctx.accounts.destination_account.to_account_info(),
+```
+
 
 Notes:
 1. Remove msg! in production version.
